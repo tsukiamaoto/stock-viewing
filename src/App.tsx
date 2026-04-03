@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Activity, LayoutDashboard, Star, Newspaper } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -124,7 +124,21 @@ function DashboardPage({
 function App() {
   const [interval, setInterval] = useState('D');
   const [configs, setConfigs] = useState<WidgetConfig[]>(INITIAL_CONFIG);
-  const [watchlist, setWatchlist] = useState<WatchlistStock[]>(DEFAULT_WATCHLIST);
+  const [watchlist, setWatchlist] = useState<WatchlistStock[]>(() => {
+    try {
+      const saved = localStorage.getItem('stock_watchlist');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to parse watchlist from local storage', e);
+    }
+    return DEFAULT_WATCHLIST;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('stock_watchlist', JSON.stringify(watchlist));
+  }, [watchlist]);
 
   return (
     <BrowserRouter>

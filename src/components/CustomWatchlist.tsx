@@ -1,5 +1,7 @@
-import React, { useEffect, useState, memo } from 'react';
-import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
+import React, { useState, memo } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { usePolling } from '../hooks/usePolling';
+import { getPriceColorClass, PriceChangeIcon } from './shared/PriceChangeDisplay';
 
 interface WatchlistStock {
   code: string;
@@ -32,7 +34,8 @@ const CustomWatchlist: React.FC<CustomWatchlistProps> = ({ stocks }) => {
     setLoading(true);
     try {
       // Use TWSE open API for real-time stock data
-      const res = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+      const apiUrl = import.meta.env.VITE_TWSE_OPEN_API_URL || 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
+      const res = await fetch(apiUrl);
       const data = await res.json();
 
       const matched: StockPrice[] = [];
@@ -86,24 +89,7 @@ const CustomWatchlist: React.FC<CustomWatchlistProps> = ({ stocks }) => {
     }
   };
 
-  useEffect(() => {
-    fetchPrices();
-    // Auto refresh every 60 seconds
-    const timer = setInterval(fetchPrices, 60000);
-    return () => clearInterval(timer);
-  }, [stocks]);
-
-  const getChangeColor = (change: string) => {
-    const val = parseFloat(change);
-    if (isNaN(val) || val === 0) return 'neutral';
-    return val > 0 ? 'up' : 'down';
-  };
-
-  const getChangeIcon = (change: string) => {
-    const val = parseFloat(change);
-    if (isNaN(val) || val === 0) return <Minus size={14} />;
-    return val > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />;
-  };
+  usePolling(fetchPrices, 60000, [stocks]);
 
   return (
     <div className="custom-watchlist">
@@ -137,14 +123,14 @@ const CustomWatchlist: React.FC<CustomWatchlistProps> = ({ stocks }) => {
               </tr>
             ) : (
               prices.map((stock) => {
-                const dir = getChangeColor(stock.change);
+                const dir = getPriceColorClass(stock.change);
                 return (
                   <tr key={stock.code} className={`stock-row stock-${dir}`}>
                     <td><span className="wl-code-badge">{stock.code}</span></td>
                     <td className="stock-name">{stock.name}</td>
                     <td className="text-right stock-price">{stock.price}</td>
                     <td className={`text-right stock-change ${dir}`}>
-                      {getChangeIcon(stock.change)}
+                      <PriceChangeIcon change={stock.change} />
                       {stock.change}
                     </td>
                     <td className={`text-right stock-change ${dir}`}>

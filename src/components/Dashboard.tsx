@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import ChartWidget from './ChartWidget';
 import SymbolInfoWidget from './SymbolInfoWidget';
 import { type WidgetConfig } from './LayoutSettings';
 import { Wifi, WifiOff } from 'lucide-react';
+import { usePolling } from '../hooks/usePolling';
 
 interface DashboardProps {
   interval: string;
@@ -100,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ interval, configs }) => {
   }, [configs]);
 
   // Check market status every 30 seconds
-  useEffect(() => {
+  usePolling(() => {
     // Initialize previous state
     for (const c of configs) {
       if (prevOpenRef.current[c.id] === undefined) {
@@ -108,9 +109,7 @@ const Dashboard: React.FC<DashboardProps> = ({ interval, configs }) => {
       }
     }
     checkMarkets();
-    const timer = setInterval(checkMarkets, 30000);
-    return () => clearInterval(timer);
-  }, [checkMarkets, configs]);
+  }, 30000, [checkMarkets, configs]);
 
   return (
     <div className="dashboard-grid">

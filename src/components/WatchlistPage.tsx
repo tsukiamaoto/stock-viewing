@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
-import { Plus, X, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ArrowLeft, Search, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
+import Box from '@mui/material/Box';
 export interface WatchlistStock {
   code: string;
   name: string;
   symbol: string;
+}
+
+interface StockEntry {
+  code: string;
+  name: string;
 }
 
 interface WatchlistPageProps {
@@ -13,27 +20,109 @@ interface WatchlistPageProps {
   onStocksChange: (stocks: WatchlistStock[]) => void;
 }
 
+/**
+ * Parse the ISIN HTML table from TWSE to extract stock codes and names.
+ * The table contains rows with: ISIN, 代號, 名稱, 上市日, 市場, 產業, CFI
+ * We only want rows where the code is a pure number (stock, not ETF/warrant/etc).
+ */
+function parseIsinHtml(html: string): StockEntry[] {
+  const results: StockEntry[] = [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const rows = doc.querySelectorAll('table.h4 tr');
+
+  for (const row of rows) {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 3) continue;
+
+    // Column 0 = "有價證券代號及名稱" (format: "2330　台積電")
+    const codeNameText = cells[0]?.textContent?.trim() || '';
+    // Column 4 = 備註 category
+
+    // Parse "2330　台積電" format (separated by full-width space or tab)
+    const match = codeNameText.match(/^(\d{4,6})\s+(.+)$/);
+    if (match) {
+      const code = match[1];
+      const name = match[2].trim();
+      // Only include 4-digit codes (regular stocks) and 6-digit ETFs
+      if (/^\d{4,6}$/.test(code)) {
+        results.push({ code, name });
+      }
+    }
+  }
+
+  return results;
+}
+
+/** Fetch and cache the complete stock list from TWSE ISIN */
+let stockListCache: StockEntry[] | null = null;
+let stockListPromise: Promise<StockEntry[]> | null = null;
+
+async function fetchStockList(): Promise<StockEntry[]> {
+  if (stockListCache) return stockListCache;
+  if (stockListPromise) return stockListPromise;
+
+  stockListPromise = (async () => {
+    try {
+      const res = await fetch('/api/isin/isin/C_public.jsp?strMode=2');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const html = await res.text();
+      const list = parseIsinHtml(html);
+      stockListCache = list;
+      return list;
+    } catch (err) {
+      console.error('Failed to fetch stock list:', err);
+      // Fallback: try MOPS CSV
+      try {
+        const csvRes = await fetch('/api/mops/opendata/t187ap03_L.csv');
+        if (csvRes.ok) {
+          const text = await csvRes.text();
+          const lines = text.split('\n').slice(1); // skip header
+          const list: StockEntry[] = [];
+          for (const line of lines) {
+            const cols = line.split(',');
+            if (cols.length >= 3) {
+              const code = cols[0]?.replace(/"/g, '').trim();
+              const name = cols[1]?.replace(/"/g, '').trim();
+              if (/^\d{4,6}$/.test(code) && name) {
+                list.push({ code, name });
+              }
+            }
+          }
+          stockListCache = list;
+          return list;
+        }
+      } catch { /* fallback also failed */ }
+
+      return [];
+    }
+  })();
+
+  return stockListPromise;
+}
+
+
 const WatchlistPage: React.FC<WatchlistPageProps> = ({ stocks, onStocksChange }) => {
-  const [inputCode, setInputCode] = useState('');
-  const [inputName, setInputName] = useState('');
+  const [allStocks, setAllStocks] = useState<StockEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inputValue, setInputValue] = useState('');
 
-  const handleAdd = () => {
-    const code = inputCode.trim();
-    const name = inputName.trim() || code;
-    if (!code) return;
-    if (stocks.some(s => s.code === code)) return;
+  // Load stock list on mount
+  useEffect(() => {
+    fetchStockList().then((list) => {
+      setAllStocks(list);
+      setLoading(false);
+    });
+  }, []);
 
-    onStocksChange([...stocks, { code, name, symbol: `TWSE:${code}` }]);
-    setInputCode('');
-    setInputName('');
+  const handleSelect = (entry: StockEntry | null) => {
+    if (!entry) return;
+    if (stocks.some(s => s.code === entry.code)) return;
+    onStocksChange([...stocks, { code: entry.code, name: entry.name, symbol: `TWSE:${entry.code}` }]);
   };
 
   const handleRemove = (code: string) => {
     onStocksChange(stocks.filter(s => s.code !== code));
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleAdd();
   };
 
   return (
@@ -44,31 +133,95 @@ const WatchlistPage: React.FC<WatchlistPageProps> = ({ stocks, onStocksChange })
           返回監控首頁
         </Link>
         <h1 className="watchlist-page-title">⭐️ 自選股管理</h1>
-        <p className="watchlist-page-subtitle">在此新增或移除您追蹤的台股股票，變更會即時反映在首頁的自選股區塊。</p>
+        <p className="watchlist-page-subtitle">
+          輸入股票代碼或公司名稱即可搜尋新增，變更會即時反映在首頁。
+        </p>
       </div>
 
-      {/* Add form */}
-      <div className="watchlist-add-row">
-        <input
-          type="text"
-          className="wl-input"
-          placeholder="台股代碼 (例如 2330)"
-          value={inputCode}
-          onChange={(e) => setInputCode(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <input
-          type="text"
-          className="wl-input"
-          placeholder="自訂名稱 (選填，例如 台積電)"
-          value={inputName}
-          onChange={(e) => setInputName(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <button className="wl-add-btn" onClick={handleAdd} disabled={!inputCode.trim()}>
-          <Plus size={16} />
-          新增股票
-        </button>
+      {/* Search bar with autocomplete */}
+      <div className="watchlist-add-row" style={{ position: 'relative', marginTop: '16px' }}>
+        <div className="wl-search-wrapper-mui" style={{ flexGrow: 1 }}>
+          <Autocomplete
+            options={allStocks}
+            getOptionLabel={(option) => `${option.code} ${option.name}`}
+            loading={loading}
+            fullWidth
+            inputValue={inputValue}
+            onInputChange={(_, newInputValue) => {
+              setInputValue(newInputValue);
+            }}
+            onChange={(_, newValue) => {
+              if (newValue) {
+                handleSelect(newValue);
+                setInputValue('');
+              }
+            }}
+            filterOptions={(options, state) => {
+              // Custom filter to allow space-separated multiple keywords matching
+              if (!state.inputValue) return options.slice(0, 100); // return top 100 empty state
+              const inputWords = state.inputValue.toLowerCase().split(/\s+/).filter(Boolean);
+              
+              return options.filter((option) => {
+                const targetText = `${option.code} ${option.name}`.toLowerCase();
+                // Must match ALL input words
+                return inputWords.every(word => targetText.includes(word));
+              }).slice(0, 50); // limit 50 results for performance
+            }}
+            blurOnSelect
+            clearOnBlur
+            getOptionDisabled={(option) => stocks.some(s => s.code === option.code)}
+            renderOption={(props, option) => {
+              const alreadyAdded = stocks.some((s) => s.code === option.code);
+              const { key, ...otherProps } = props as any;
+              return (
+                <Box component="li" key={key} {...otherProps} sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', py: 1, borderBottom: '1px solid #f0f0f0' }}>
+                  <Box>
+                    <span style={{ display: 'inline-block', width: '60px', fontWeight: 'bold', color: '#1a73e8' }}>{option.code}</span>
+                    <span>{option.name}</span>
+                  </Box>
+                  {alreadyAdded && <span style={{ fontSize: '0.8rem', color: '#aaa' }}>已加入</span>}
+                </Box>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                placeholder={loading ? '正在載入股票清單...' : '搜尋股票代碼或名稱 (例如 2330 或 台積電)'}
+                variant="outlined" 
+                size="medium"
+                sx={{ 
+                  backgroundColor: '#fff', 
+                  borderRadius: 2,
+                  '& .MuiOutlinedInput-root': {
+                    paddingLeft: '32px'
+                  }
+                }}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <>
+                      <Search size={20} style={{ color: '#666', position: 'absolute', left: '12px', zIndex: 1 }} />
+                      {params.InputProps.startAdornment}
+                    </>
+                  ),
+                  endAdornment: (
+                    <>
+                      {loading ? <Loader2 size={18} className="spin" style={{ position: 'absolute', right: '40px' }} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            noOptionsText={inputValue ? "找不到符合的股票" : "請輸入股票代碼或名稱開始搜尋"}
+          />
+        </div>
+
+        <div className="wl-search-hint" style={{ marginTop: '8px', fontSize: '0.9rem', color: '#666' }}>
+          {allStocks.length > 0 && (
+            <span>📊 已載入 {allStocks.length.toLocaleString()} 檔上市證券</span>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -86,7 +239,7 @@ const WatchlistPage: React.FC<WatchlistPageProps> = ({ stocks, onStocksChange })
           <tbody>
             {stocks.length === 0 ? (
               <tr>
-                <td colSpan={5} className="wl-empty">尚未加入任何自選股，請在上方輸入股票代碼新增</td>
+                <td colSpan={5} className="wl-empty">尚未加入任何自選股，請在上方搜尋股票代碼或名稱新增</td>
               </tr>
             ) : (
               stocks.map((stock, index) => (
@@ -109,7 +262,7 @@ const WatchlistPage: React.FC<WatchlistPageProps> = ({ stocks, onStocksChange })
       </div>
 
       <div className="wl-tip">
-        💡 提示：輸入台股代碼後按 Enter 可以快速新增。新增的股票會自動出現在首頁的「我的自選股追蹤」中。
+        💡 提示：輸入代碼或名稱後，從下拉選單點選即可新增。也可以直接輸入代碼按 Enter 快速新增。
       </div>
     </div>
   );

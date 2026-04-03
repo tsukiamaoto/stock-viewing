@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ExternalLink, RefreshCw, Rss } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import AIAssistantWidget from './AIAssistantWidget';
 
 interface FeedItem {
   title: string;
@@ -10,23 +11,7 @@ interface FeedItem {
   sourceColor: string;
 }
 
-const RSS_SOURCES = [
-  {
-    name: 'CNN Money',
-    url: 'https://rss.cnn.com/rss/money_latest.rss',
-    color: '#cc0000',
-  },
-  {
-    name: 'Reuters',
-    url: 'https://www.reutersagency.com/feed/?best-topics=business-finance',
-    color: '#ff8000',
-  },
-  {
-    name: 'NHK World',
-    url: 'https://www3.nhk.or.jp/rss/news/cat0.xml',
-    color: '#0068b7',
-  },
-];
+// Backend will handle the RSS sources
 
 const QUICK_LINKS = [
   { name: 'CNN 財經', url: 'https://edition.cnn.com/business', color: '#cc0000', icon: '📺' },
@@ -44,38 +29,32 @@ const NewsPage: React.FC = () => {
   const fetchFeeds = async () => {
     setLoading(true);
     setError(null);
-    const allItems: FeedItem[] = [];
-
-    for (const source of RSS_SOURCES) {
-      try {
-        const res = await fetch(
-          `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`
-        );
-        const json = await res.json();
-        if (json.status === 'ok' && json.items) {
-          for (const item of json.items.slice(0, 8)) {
-            allItems.push({
-              title: item.title,
-              link: item.link,
-              pubDate: item.pubDate,
-              source: source.name,
-              sourceColor: source.color,
-            });
-          }
-        }
-      } catch {
-        // Skip failed source
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    
+    try {
+      const res = await fetch(`${apiBase}/api/news/latest?symbol=Macro`);
+      if (!res.ok) throw new Error('Network error');
+      const json = await res.json();
+      
+      if (json.status === 'success' && json.data) {
+        // Sort by date descending safely
+        const sorted = json.data.sort((a: any, b: any) => {
+          try {
+             return new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime();
+          } catch { return 0; }
+        });
+        setFeedItems(sorted);
+      } else {
+        setError('無法取得資料，請使用下方的快速連結前往各網站查看。');
       }
+    } catch (e) {
+      console.error(e);
+      setError(`無法連接後端伺服器 (${apiBase})，請確認 FastAPI 已啟動。`);
     }
-
-    // Sort by date descending
-    allItems.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-    setFeedItems(allItems);
-    if (allItems.length === 0) {
-      setError('無法取得 RSS 資料，請使用下方的快速連結前往各網站查看。');
-    }
+    
     setLoading(false);
   };
+
 
   useEffect(() => {
     fetchFeeds();
@@ -106,6 +85,10 @@ const NewsPage: React.FC = () => {
         <p className="news-page-subtitle">
           整合 CNN、路透、NHK 等國際財經消息，以及金十數據和 TWSE ETF 公告的快速連結。
         </p>
+      </div>
+
+      <div style={{ marginBottom: '24px' }}>
+        <AIAssistantWidget symbol="Macro" />
       </div>
 
       {/* Quick Links */}

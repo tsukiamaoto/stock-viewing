@@ -1,5 +1,7 @@
-import React, { useEffect, useState, memo } from 'react';
-import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
+import React, { useState, memo } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { usePolling } from '../hooks/usePolling';
+import { getPriceColorClass, PriceChangeIcon } from './shared/PriceChangeDisplay';
 
 interface TwseQuote {
   name: string;
@@ -128,18 +130,7 @@ const TaiwanMarketSection: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-    // 每 10 秒自動更新
-    const timer = setInterval(fetchData, 10000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const getIcon = (isUp: boolean | null) => {
-    if (isUp === true) return <TrendingUp size={16} />;
-    if (isUp === false) return <TrendingDown size={16} />;
-    return <Minus size={16} />;
-  };
+  usePolling(fetchData, 10000);
 
   return (
     <div className="tw-market-section">
@@ -156,11 +147,11 @@ const TaiwanMarketSection: React.FC = () => {
             </div>
             <div className="tw-market-card-body">
               <div className="tw-market-price-row">
-                <span className={`tw-market-price ${q.isUp === true ? 'up' : q.isUp === false ? 'down' : ''}`}>
+                <span className={`tw-market-price ${getPriceColorClass(q.isUp)}`}>
                   {q.price}
                 </span>
-                <span className={`tw-market-change ${q.isUp === true ? 'up' : q.isUp === false ? 'down' : ''}`}>
-                  {getIcon(q.isUp)}
+                <span className={`tw-market-change ${getPriceColorClass(q.isUp)}`}>
+                  <PriceChangeIcon change={q.isUp} size={16} />
                   {q.change} ({q.changePercent})
                 </span>
               </div>

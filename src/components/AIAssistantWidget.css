@@ -1,0 +1,191 @@
+.ai-widget-container {
+  margin: 10px 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-generate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #f8fafc;
+  border: 1px solid #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.ai-generate-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+}
+
+.ai-icon {
+  color: #fbbf24;
+}
+
+/* Glassmorphism Card */
+.ai-card {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+  overflow: hidden;
+}
+
+.glass-effect {
+  background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.ai-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+  cursor: pointer;
+}
+
+.ai-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-icon-active {
+  color: #8b5cf6;
+  animation: ai-float 3s ease-in-out infinite;
+}
+
+.ai-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ai-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.ai-toggle-btn:hover {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+
+.ai-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 12px;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.ai-spinner {
+  animation: ai-spin 1s linear infinite;
+  color: #8b5cf6;
+}
+
+@keyframes ai-spin {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes ai-float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0px); }
+}
+
+.ai-content {
+  padding: 16px;
+}
+
+.ai-fade-in {
+  animation: aiFadeIn 0.5s ease-out;
+}
+
+@keyframes aiFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-summary p {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.ai-news-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-category {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+.ai-category-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-icon {
+  font-size: 1rem;
+}
+
+.ai-news-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.ai-news-list li {
+  margin-bottom: 4px;
+}
+
+.ai-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(226, 232, 240, 0.5);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.ai-timestamp {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}

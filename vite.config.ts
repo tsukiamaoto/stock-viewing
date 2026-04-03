@@ -32,6 +32,18 @@ export default defineConfig({
           'Origin': 'https://mis.taifex.com.tw',
         },
       },
+      // 代理 ISIN 證券代號清單 (上市公司代號/名稱)
+      '/api/isin': {
+        target: 'https://isin.twse.com.tw',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/isin/, ''),
+      },
+      // 代理 MOPS 公開資訊觀測站 CSV (上市/上櫃公司清單)
+      '/api/mops': {
+        target: 'https://mopsfin.twse.com.tw',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/mops/, ''),
+      },
     },
   },
 })
