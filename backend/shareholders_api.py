@@ -128,10 +128,32 @@ def get_shareholders(code: str = Path(..., description="Stock code, e.g. 2330"))
         summary = _parse_summary_table(soup)
         detail = _parse_detail_table(soup)
 
+        # Fetch trailing EPS from yfinance to calculate PE
+        eps = None
+        try:
+            import yfinance as yf
+            ticker_sym = code if "." in code else f"{code}.TW"
+            info = yf.Ticker(ticker_sym).info
+            eps = info.get("trailingEps")
+        except Exception as e:
+            print(f"[Shareholders API] EPS fetch failed: {e}")
+
+        # Add PE to each summary row
+        for row in summary:
+            try:
+                price = float(row["closePrice"])
+                if eps and eps > 0:
+                    row["pe"] = round(price / eps, 2)
+                else:
+                    row["pe"] = "--"
+            except (ValueError, TypeError):
+                row["pe"] = "--"
+
         return {
             "status": "success",
             "data": {
                 "code": code,
+                "eps": eps,
                 "summary": summary[:52],  # ~1 year of weekly data
                 "detail": detail,
             }
@@ -139,3 +161,4 @@ def get_shareholders(code: str = Path(..., description="Stock code, e.g. 2330"))
     except Exception as e:
         print(f"[Shareholders API] Error fetching {code}: {e}")
         return {"status": "error", "message": str(e)}
+

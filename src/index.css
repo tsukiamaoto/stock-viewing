@@ -1137,6 +1137,27 @@ h1 {
 .shareholders-table .text-center {
   text-align: center;
 }
+.shareholders-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+}
+.shareholders-charts > .shareholders-chart-card:first-child {
+  grid-column: 1 / -1;
+}
+.shareholders-chart-card {
+  background: #f8fafc;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+.shareholders-chart-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
 .back-link {
   display: inline-flex;
   align-items: center;

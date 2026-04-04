@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface StockDetailData {
   basic: {
@@ -21,6 +22,7 @@ interface ShareholderSummary {
   gt400Shares: string; gt400Pct: string; gt400Count: string;
   range400_600: string; range600_800: string; range800_1000: string;
   gt1000Count: string; gt1000Pct: string; closePrice: string;
+  pe: number | string;
 }
 
 interface ShareholderDetail {
@@ -30,6 +32,7 @@ interface ShareholderDetail {
 
 interface ShareholderData {
   code: string;
+  eps: number | null;
   summary: ShareholderSummary[];
   detail: ShareholderDetail;
 }
@@ -271,6 +274,74 @@ const StockDetailPage: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* Line Charts */}
+          {(() => {
+            const chartData = shData.summary.slice(0, showWeeks).map(r => ({
+              date: r.date.slice(5),
+              closePrice: parseFloat(r.closePrice) || 0,
+              pe: typeof r.pe === 'number' ? r.pe : 0,
+              gt400Pct: parseFloat(r.gt400Pct) || 0,
+              gt1000Pct: parseFloat(r.gt1000Pct) || 0,
+              totalHolders: parseInt(r.totalHolders.replace(/,/g, '')) || 0,
+              avgShares: parseFloat(r.avgShares) || 0,
+            })).reverse();
+
+            return (
+              <div className="shareholders-charts">
+                {/* Chart 1: 收盤價 + PE */}
+                <div className="shareholders-chart-card">
+                  <h5 className="shareholders-chart-title">收盤價 / 本益比 (PE)</h5>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                      <YAxis yAxisId="price" tick={{ fontSize: 11 }} />
+                      <YAxis yAxisId="pe" orientation="right" tick={{ fontSize: 11, fill: '#8b5cf6' }} />
+                      <Tooltip contentStyle={{ fontSize: '0.82rem' }} />
+                      <Legend wrapperStyle={{ fontSize: '0.82rem' }} />
+                      <Line yAxisId="price" type="monotone" dataKey="closePrice" name="收盤價" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                      <Line yAxisId="pe" type="monotone" dataKey="pe" name="PE" stroke="#8b5cf6" strokeWidth={2} dot={false} strokeDasharray="5 3" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Chart 2: 大股東持有比例 */}
+                <div className="shareholders-chart-card">
+                  <h5 className="shareholders-chart-title">大股東持有比例 (%)</h5>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                      <YAxis tick={{ fontSize: 11 }} domain={['dataMin - 0.5', 'dataMax + 0.5']} />
+                      <Tooltip contentStyle={{ fontSize: '0.82rem' }} formatter={(v: any) => `${Number(v).toFixed(2)}%`} />
+                      <Legend wrapperStyle={{ fontSize: '0.82rem' }} />
+                      <Line type="monotone" dataKey="gt400Pct" name=">400張 %" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="gt1000Pct" name=">1000張 %" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Chart 3: 總股東人數 + 平均持股 */}
+                <div className="shareholders-chart-card">
+                  <h5 className="shareholders-chart-title">總股東人數 / 平均張數</h5>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                      <YAxis yAxisId="holders" tick={{ fontSize: 11 }} />
+                      <YAxis yAxisId="avg" orientation="right" tick={{ fontSize: 11, fill: '#10b981' }} />
+                      <Tooltip contentStyle={{ fontSize: '0.82rem' }} />
+                      <Legend wrapperStyle={{ fontSize: '0.82rem' }} />
+                      <Line yAxisId="holders" type="monotone" dataKey="totalHolders" name="總股東人數" stroke="#6366f1" strokeWidth={2} dot={false} />
+                      <Line yAxisId="avg" type="monotone" dataKey="avgShares" name="平均張數/人" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="5 3" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{ overflowX: 'auto' }}>
             <table className="detail-holders-table shareholders-table">
               <thead>
@@ -288,6 +359,7 @@ const StockDetailPage: React.FC = () => {
                   <th className="text-right">&gt;1000張人數</th>
                   <th className="text-right">&gt;1000張%</th>
                   <th className="text-right">收盤價</th>
+                  <th className="text-right">本益比</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,6 +378,7 @@ const StockDetailPage: React.FC = () => {
                     <td className="text-right">{row.gt1000Count}</td>
                     <td className="text-right" style={{ fontWeight: 700 }}>{row.gt1000Pct}%</td>
                     <td className="text-right" style={{ fontWeight: 700 }}>{row.closePrice}</td>
+                    <td className="text-right" style={{ fontWeight: 700, color: '#8b5cf6' }}>{row.pe}</td>
                   </tr>
                 ))}
               </tbody>
