@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // 代理 TWSE OpenAPI (收盤統計資料)
+      '/api/twse-open': {
+        target: 'https://openapi.twse.com.tw',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/twse-open/, ''),
+      },
       // 代理 TWSE 即時報價 API (加權指數、個股等)
       '/api/twse': {
         target: 'https://mis.twse.com.tw',
@@ -15,12 +21,6 @@ export default defineConfig({
           'Referer': 'https://mis.twse.com.tw/',
           'Origin': 'https://mis.twse.com.tw',
         },
-      },
-      // 代理 TWSE OpenAPI (收盤統計資料)
-      '/api/twse-open': {
-        target: 'https://openapi.twse.com.tw',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/twse-open/, ''),
       },
       // 代理 TAIFEX 期交所資料
       '/api/taifex': {

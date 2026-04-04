@@ -15,9 +15,10 @@ interface StockPrice {
   price: string;
   change: string;
   changePercent: string;
-  open: string;
-  high: string;
-  low: string;
+  d5_change: string;
+  d5_pct: string;
+  d7_change: string;
+  d7_pct: string;
   volume: string;
 }
 
@@ -31,58 +32,53 @@ const CustomWatchlist: React.FC<CustomWatchlistProps> = ({ stocks }) => {
   const [lastUpdate, setLastUpdate] = useState<string>('');
 
   const fetchPrices = async () => {
+    if (stocks.length === 0) {
+      setPrices([]);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
-      // Use TWSE open API for real-time stock data
-      const apiUrl = import.meta.env.VITE_TWSE_OPEN_API_URL || 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
-      const res = await fetch(apiUrl);
-      const data = await res.json();
-
-      const matched: StockPrice[] = [];
-      for (const stock of stocks) {
-        const found = data.find((d: Record<string, string>) => d.Code === stock.code);
-        if (found) {
-          const close = parseFloat(found.ClosingPrice) || 0;
-          const prevClose = parseFloat(found.ClosingPrice) || 0; // STOCK_DAY_ALL may not have prev
-          matched.push({
-            code: stock.code,
-            name: stock.name || found.Name,
-            price: found.ClosingPrice || '--',
-            change: found.Change || '--',
-            changePercent: close && prevClose ? ((parseFloat(found.Change || '0') / (close - parseFloat(found.Change || '0'))) * 100).toFixed(2) : '--',
-            open: found.OpeningPrice || '--',
-            high: found.HighestPrice || '--',
-            low: found.LowestPrice || '--',
-            volume: found.TradeVolume ? parseInt(found.TradeVolume).toLocaleString() : '--',
-          });
-        } else {
-          matched.push({
-            code: stock.code,
-            name: stock.name,
-            price: '--',
-            change: '--',
-            changePercent: '--',
-            open: '--',
-            high: '--',
-            low: '--',
-            volume: '--',
-          });
-        }
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const symbols = stocks.map(s => s.code).join(',');
+      const res = await fetch(`${apiUrl}/api/stocks/watchlist?symbols=${symbols}`);
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      
+      if (json.status === 'success') {
+        // Merge the backend data with stock name from props
+        const matched: StockPrice[] = stocks.map(stock => {
+          const found = json.data.find((d: any) => d.code === stock.code);
+          if (found) {
+             return {
+               code: stock.code,
+               name: stock.name,
+               price: found.price || '--',
+               change: found.change || '--',
+               changePercent: found.changePercent || '--',
+               d5_change: found.d5_change || '--',
+               d5_pct: found.d5_pct || '--',
+               d7_change: found.d7_change || '--',
+               d7_pct: found.d7_pct || '--',
+               volume: found.volume || '--',
+             };
+          }
+          return {
+            code: stock.code, name: stock.name, price: '--', change: '--',
+            changePercent: '--', d5_change: '--', d5_pct: '--', d7_change: '--', d7_pct: '--', volume: '--'
+          };
+        });
+        setPrices(matched);
       }
-      setPrices(matched);
       setLastUpdate(new Date().toLocaleTimeString('zh-TW'));
-    } catch {
-      // If API fails, show placeholders
+    } catch (err) {
+      console.error('Failed to fetch historical quotes:', err);
+      // Fallback
       setPrices(stocks.map(s => ({
-        code: s.code,
-        name: s.name,
-        price: '--',
-        change: '--',
-        changePercent: '--',
-        open: '--',
-        high: '--',
-        low: '--',
-        volume: '--',
+        code: s.code, name: s.name, price: '--', change: '--', changePercent: '--',
+        d5_change: '--', d5_pct: '--', d7_change: '--', d7_pct: '--', volume: '--'
       })));
     } finally {
       setLoading(false);
@@ -101,44 +97,69 @@ const CustomWatchlist: React.FC<CustomWatchlistProps> = ({ stocks }) => {
           <RefreshCw size={14} className={loading ? 'spin' : ''} />
         </button>
       </div>
-      <div className="watchlist-table-wrapper">
+      <div className="watchlist-table-wrapper" style={{ overflowX: 'auto' }}>
         <table className="watchlist-price-table">
           <thead>
             <tr>
               <th>代碼</th>
-              <th>名稱</th>
+              <th>名稱 / 股東資訊</th>
               <th className="text-right">收盤價</th>
-              <th className="text-right">漲跌</th>
-              <th className="text-right">漲跌%</th>
-              <th className="text-right">開盤</th>
-              <th className="text-right">最高</th>
-              <th className="text-right">最低</th>
+              <th className="text-right">今日漲跌</th>
+              <th className="text-right">今日幅%</th>
+              <th className="text-right">5日漲跌</th>
+              <th className="text-right">5日幅%</th>
+              <th className="text-right">7日漲跌</th>
+              <th className="text-right">7日幅%</th>
               <th className="text-right">成交量</th>
             </tr>
           </thead>
           <tbody>
             {prices.length === 0 && !loading ? (
               <tr>
-                <td colSpan={9} className="wl-empty">尚未加入自選股，請前往「自選股管理」新增</td>
+                <td colSpan={10} className="wl-empty">尚未加入自選股，請前往「自選股管理」新增</td>
               </tr>
             ) : (
               prices.map((stock) => {
-                const dir = getPriceColorClass(stock.change);
+                const d1dir = getPriceColorClass(stock.change);
+                const d5dir = getPriceColorClass(stock.d5_change);
+                const d7dir = getPriceColorClass(stock.d7_change);
+                
                 return (
-                  <tr key={stock.code} className={`stock-row stock-${dir}`}>
+                  <tr key={stock.code} className={`stock-row stock-${d1dir}`}>
                     <td><span className="wl-code-badge">{stock.code}</span></td>
-                    <td className="stock-name">{stock.name}</td>
-                    <td className="text-right stock-price">{stock.price}</td>
-                    <td className={`text-right stock-change ${dir}`}>
-                      <PriceChangeIcon change={stock.change} />
-                      {stock.change}
+                    <td className="stock-name">
+                      <a href={`https://norway.twsthr.info/StockHolders.aspx?stock=${stock.code}`} target="_blank" rel="noreferrer" title="查看股東持有數" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                        {stock.name} ↗
+                      </a>
                     </td>
-                    <td className={`text-right stock-change ${dir}`}>
+                    <td className="text-right stock-price">{stock.price}</td>
+                    <td className="text-right">
+                      <span className={`stock-change ${d1dir}`}>
+                        <PriceChangeIcon change={stock.change} />
+                        {stock.change}
+                      </span>
+                    </td>
+                    <td className={`text-right ${d1dir}`}>
                       {stock.changePercent !== '--' ? `${stock.changePercent}%` : '--'}
                     </td>
-                    <td className="text-right">{stock.open}</td>
-                    <td className="text-right">{stock.high}</td>
-                    <td className="text-right">{stock.low}</td>
+                    <td className="text-right">
+                      <span className={`stock-change ${d5dir}`}>
+                        <PriceChangeIcon change={stock.d5_change} />
+                        {stock.d5_change}
+                      </span>
+                    </td>
+                    <td className={`text-right ${d5dir}`}>
+                      {stock.d5_pct !== '--' ? `${stock.d5_pct}%` : '--'}
+                    </td>
+                    <td className="text-right">
+                      <span className={`stock-change ${d7dir}`}>
+                        <PriceChangeIcon change={stock.d7_change} />
+                        {stock.d7_change}
+                      </span>
+                    </td>
+                    <td className={`text-right ${d7dir}`}>
+                      {stock.d7_pct !== '--' ? `${stock.d7_pct}%` : '--'}
+                    </td>
                     <td className="text-right">{stock.volume}</td>
                   </tr>
                 );

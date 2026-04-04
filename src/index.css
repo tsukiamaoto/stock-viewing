@@ -852,19 +852,23 @@ h1 {
 
 .watchlist-price-table th {
   text-align: left;
-  padding: 10px 12px;
-  font-size: 0.78rem;
+  padding: 8px 8px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--panel-border);
   background: #f8fafc;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .watchlist-price-table td {
-  padding: 10px 12px;
+  padding: 8px 8px;
   border-bottom: 1px solid var(--panel-border);
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .watchlist-price-table tbody tr:hover {
@@ -884,29 +888,32 @@ h1 {
   font-size: 0.95rem;
 }
 
+/* Use inline-flex on span inside td — keeps td as table-cell */
 .stock-change {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  gap: 3px;
   font-weight: 600;
+  font-size: 0.85rem;
 }
 
-.stock-change.up {
-  color: #dc2626;
+.stock-change.up, td.up { color: #dc2626; }
+.stock-change.down, td.down { color: #16a34a; }
+.stock-change.neutral, td.neutral { color: var(--text-secondary); }
+
+/* Fixed height watchlist with scrollbar */
+.custom-watchlist {
+  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel-bg);
 }
 
-.stock-change.down {
-  color: #16a34a;
-}
-
-.stock-change.neutral {
-  color: var(--text-secondary);
-}
-
-/* ===== News Page ===== */
+/* ===== News Page (Legacy classes - kept for CSS compatibility) ===== */
 .news-page {
-  max-width: 960px;
+  max-width: 1400px;
 }
 
 .news-page-header {
@@ -963,19 +970,11 @@ h1 {
   box-shadow: 0 6px 16px rgba(0,0,0,0.08);
 }
 
-.quick-link-icon {
-  font-size: 1.2rem;
-}
+.quick-link-icon { font-size: 1.2rem; }
+.quick-link-name { flex: 1; }
+.quick-link-ext { color: var(--text-secondary); }
 
-.quick-link-name {
-  flex: 1;
-}
-
-.quick-link-ext {
-  color: var(--text-secondary);
-}
-
-/* RSS Feed */
+/* RSS Feed (legacy) */
 .news-feed-header {
   display: flex;
   justify-content: space-between;
@@ -1032,13 +1031,8 @@ h1 {
   transition: background 0.15s;
 }
 
-.news-feed-item:last-child {
-  border-bottom: none;
-}
-
-.news-feed-item:hover {
-  background: #f8fafc;
-}
+.news-feed-item:last-child { border-bottom: none; }
+.news-feed-item:hover { background: #f8fafc; }
 
 .news-source-badge {
   font-size: 0.7rem;
@@ -1064,10 +1058,531 @@ h1 {
   flex-shrink: 0;
 }
 
+/* CNN badge (legacy) */
+.cnn-logo-badge {
+  display: inline-block;
+  background: #cc0000;
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 5px;
+  line-height: 1;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.cnn-table-container {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-top: 3px solid #cc0000;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(204, 0, 0, 0.06);
+  margin-bottom: 0.5rem;
+}
+
+.cnn-news-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.cnn-th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #fdf5f5;
+  border-bottom: 1px solid #fecaca;
+  white-space: nowrap;
+}
+
+.cnn-th-no   { width: 36px; text-align: center; }
+.cnn-th-section { width: 100px; }
+.cnn-th-title { width: auto; }
+.cnn-th-date  { width: 90px; }
+.cnn-th-action { width: 50px; text-align: center; }
+
+.cnn-tr { border-bottom: 1px solid var(--panel-border); transition: background 0.12s; }
+.cnn-tr:last-child { border-bottom: none; }
+.cnn-tr:hover { background: #fff5f5; }
+
+.cnn-td { padding: 12px 14px; vertical-align: middle; color: var(--text-primary); }
+.cnn-td-no { text-align: center; font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
+
+.cnn-section-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cnn-td-title { max-width: 0; }
+
+.cnn-title-link {
+  display: block;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.cnn-title-link:hover { color: #cc0000; }
+.cnn-td-date { font-size: 0.76rem; color: var(--text-secondary); white-space: nowrap; }
+.cnn-td-action { text-align: center; }
+
+.cnn-ext-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cnn-ext-btn:hover { background: #fef2f2; color: #cc0000; }
+
+
+/* ===== NEW: News Source Blocks (ns-*) ===== */
+
+/* Page Layout */
+.ns-page {
+  max-width: 1600px;
+}
+
+.ns-page-header {
+  margin-bottom: 1.25rem;
+}
+
+.ns-page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0.25rem;
+}
+
+.ns-page-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0.4rem 0 0.1rem;
+  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ns-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  margin: 0 0 0;
+}
+
+.ns-refresh-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--accent-color);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.ns-refresh-all-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+/* Quick Chip Bar */
+.ns-quick-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.ns-quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--chip-color, #3b82f6);
+  color: var(--chip-color, #3b82f6);
+  background: color-mix(in srgb, var(--chip-color, #3b82f6) 8%, transparent);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.ns-quick-chip:hover {
+  background: color-mix(in srgb, var(--chip-color, #3b82f6) 15%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--chip-color, #3b82f6) 25%, transparent);
+}
+
+/* 兩欄格線 (6:6) */
+.ns-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+/* 單一新聞區塊 */
+.ns-block {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.ns-block:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* 區塊標題列 */
+.ns-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  color: #fff;
+  gap: 8px;
+  min-height: 56px;
+}
+
+.ns-block-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ns-block-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.ns-block-label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.ns-block-desc {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ns-block-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ns-block-updated {
+  font-size: 0.68rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.ns-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.ns-refresh-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.3);
+}
+
+.ns-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ns-ext-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.ns-ext-link:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* 旋轉動畫 */
+.ns-spin {
+  animation: ns-rotate 1.2s linear infinite;
+}
+
+@keyframes ns-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* 內容容器 */
+.ns-block-body {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+/* 骨架屏 */
+.ns-skeleton-list {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ns-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ns-skeleton-badge {
+  width: 28px;
+  height: 18px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  flex-shrink: 0;
+}
+
+.ns-skeleton-title {
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 錯誤/空狀態 */
+.ns-error-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 16px;
+  color: #b91c1c;
+  background: #fff5f5;
+  font-size: 0.84rem;
+  border-top: 1px solid #fecaca;
+}
+
+.ns-empty-box {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* 新聞列表 */
+.ns-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ns-item {
+  border-bottom: 1px solid var(--panel-border);
+  transition: background 0.12s;
+}
+
+.ns-item:last-child {
+  border-bottom: none;
+}
+
+.ns-item:hover {
+  background: var(--hover-bg, #f8fafc);
+}
+
+.ns-item-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+/* 左欄：序號 + 分類 */
+.ns-item-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 28px;
+}
+
+.ns-item-no {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f1f5f9;
+  flex-shrink: 0;
+}
+
+.ns-cat-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+/* 標題區 */
+.ns-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ns-item-title {
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color 0.15s;
+}
+
+.ns-item:hover .ns-item-title {
+  color: var(--link-hover, var(--accent-color));
+}
+
+.ns-item-translated {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ns-item-snippet {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 右欄：來源 + 時間 */
+.ns-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ns-source-pill {
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ns-item-date {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* ===== Watchlist Page (Search + Autocomplete) ===== */
 .watchlist-page {
   max-width: 900px;
 }
+
 
 .watchlist-page-header { margin-bottom: 1.5rem; }
 
@@ -1302,6 +1817,12 @@ h1 {
 }
 
 /* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .ns-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1200px) {
   .top-section {
     flex-direction: column;
@@ -1333,3 +1854,5 @@ h1 {
     flex-direction: column;
   }
 }
+
+

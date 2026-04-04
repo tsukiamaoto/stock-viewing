@@ -1,150 +1,333 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ExternalLink, RefreshCw, Rss } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AIAssistantWidget from './AIAssistantWidget';
 
-interface FeedItem {
+interface NewsItem {
   title: string;
+  translated_title?: string;
+  snippet?: string;
+  original_content?: string;
+  category?: string;
   link: string;
   pubDate: string;
   source: string;
   sourceColor: string;
 }
 
-// Backend will handle the RSS sources
+interface NewsSectionState {
+  items: NewsItem[];
+  loading: boolean;
+  error: string | null;
+  lastUpdated: Date | null;
+}
 
-const QUICK_LINKS = [
-  { name: 'CNN 財經', url: 'https://edition.cnn.com/business', color: '#cc0000', icon: '📺' },
-  { name: '路透社 財經', url: 'https://www.reuters.com/business/', color: '#ff8000', icon: '📰' },
-  { name: 'NHK 新聞', url: 'https://www3.nhk.or.jp/nhkworld/en/news/', color: '#0068b7', icon: '🇯🇵' },
-  { name: '金十數據', url: 'https://www.jin10.com/', color: '#1a1a2e', icon: '📊' },
-  { name: 'TWSE ETF 公告', url: 'https://www.twse.com.tw/zh/ETFortune/announcementList', color: '#003d79', icon: '🏛️' },
+// ── 各新聞來源設定 ──────────────────────────────────────────────────
+const NEWS_SOURCES = [
+  {
+    key: 'cnn',
+    endpoint: '/api/news/cnn',
+    label: 'CNN',
+    labelFull: 'CNN 財經',
+    color: '#cc0000',
+    accentBg: '#fff5f5',
+    accentBorder: '#cc0000',
+    accentHeader: 'linear-gradient(135deg, #cc0000 0%, #990000 100%)',
+    icon: '📺',
+    desc: 'CNN Business & World',
+    externalUrl: 'https://edition.cnn.com/business',
+    titleHoverColor: '#cc0000',
+  },
+  {
+    key: 'reuters',
+    endpoint: '/api/news/reuters',
+    label: 'REUTERS',
+    labelFull: '路透社',
+    color: '#e87722',
+    accentBg: '#fff8f3',
+    accentBorder: '#e87722',
+    accentHeader: 'linear-gradient(135deg, #e87722 0%, #c45e0f 100%)',
+    icon: '📰',
+    desc: 'Reuters Business, World & Markets',
+    externalUrl: 'https://www.reuters.com/business/',
+    titleHoverColor: '#c45e0f',
+  },
+  {
+    key: 'nhk',
+    endpoint: '/api/news/nhk',
+    label: 'NHK',
+    labelFull: 'NHK World',
+    color: '#0068b7',
+    accentBg: '#f0f7ff',
+    accentBorder: '#0068b7',
+    accentHeader: 'linear-gradient(135deg, #0068b7 0%, #004d8a 100%)',
+    icon: '🇯🇵',
+    desc: 'NHK World News',
+    externalUrl: 'https://www3.nhk.or.jp/nhkworld/en/news/',
+    titleHoverColor: '#0068b7',
+  },
+  {
+    key: 'jin10',
+    endpoint: '/api/news/jin10',
+    label: '金十',
+    labelFull: '金十數據',
+    color: '#c8a000',
+    accentBg: '#fffdf0',
+    accentBorder: '#c8a000',
+    accentHeader: 'linear-gradient(135deg, #c8a000 0%, #9a7b00 100%)',
+    icon: '📊',
+    desc: 'Jin10 財經快訊',
+    externalUrl: 'https://www.jin10.com/',
+    titleHoverColor: '#9a7b00',
+  },
 ];
 
-const NewsPage: React.FC = () => {
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// ── 分類顏色對應 ─────────────────────────────────────────────────────
+const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  finance:  { bg: '#dbeafe', text: '#1d4ed8' },
+  trade:    { bg: '#dcfce7', text: '#15803d' },
+  trump:    { bg: '#fef9c3', text: '#854d0e' },
+  ai:       { bg: '#ede9fe', text: '#6d28d9' },
+  energy:   { bg: '#ffedd5', text: '#c2410c' },
+  geopolitics: { bg: '#fce7f3', text: '#be185d' },
+  macro:    { bg: '#e0f2fe', text: '#0369a1' },
+  other:    { bg: '#f1f5f9', text: '#475569' },
+};
 
-  const fetchFeeds = async () => {
-    setLoading(true);
-    setError(null);
+const getCategoryStyle = (cat?: string) => CATEGORY_COLORS[cat || 'other'] || CATEGORY_COLORS['other'];
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch { return dateStr; }
+};
+
+
+// ── 單一新聞區塊元件 ─────────────────────────────────────────────────
+interface NewsSectionProps {
+  source: (typeof NEWS_SOURCES)[number];
+}
+
+const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
+  const [state, setState] = useState<NewsSectionState>({
+    items: [],
+    loading: true,
+    error: null,
+    lastUpdated: null,
+  });
+
+  const fetchNews = useCallback(async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    
     try {
-      const res = await fetch(`${apiBase}/api/news/latest?symbol=Macro`);
-      if (!res.ok) throw new Error('Network error');
+      const res = await fetch(`${apiBase}${source.endpoint}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      
       if (json.status === 'success' && json.data) {
-        // Sort by date descending safely
-        const sorted = json.data.sort((a: any, b: any) => {
-          try {
-             return new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime();
-          } catch { return 0; }
-        });
-        setFeedItems(sorted);
+        setState({ items: json.data, loading: false, error: null, lastUpdated: new Date() });
       } else {
-        setError('無法取得資料，請使用下方的快速連結前往各網站查看。');
+        setState(prev => ({ ...prev, loading: false, error: json.message || '無資料' }));
       }
-    } catch (e) {
-      console.error(e);
-      setError(`無法連接後端伺服器 (${apiBase})，請確認 FastAPI 已啟動。`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState(prev => ({ ...prev, loading: false, error: msg }));
     }
-    
-    setLoading(false);
-  };
+  }, [source.endpoint]);
 
-
-  useEffect(() => {
-    fetchFeeds();
-  }, []);
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleString('zh-TW', {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+  useEffect(() => { fetchNews(); }, [fetchNews]);
 
   return (
-    <div className="news-page">
-      <div className="news-page-header">
+    <div className="ns-block">
+      {/* 區塊 Header */}
+      <div className="ns-block-header" style={{ background: source.accentHeader }}>
+        <div className="ns-block-header-left">
+          <span className="ns-block-icon">{source.icon}</span>
+          <div>
+            <span className="ns-block-label">{source.label}</span>
+            <span className="ns-block-desc">{source.desc}</span>
+          </div>
+        </div>
+        <div className="ns-block-header-right">
+          {state.lastUpdated && (
+            <span className="ns-block-updated">
+              {state.lastUpdated.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            className="ns-refresh-btn"
+            onClick={fetchNews}
+            disabled={state.loading}
+            title="重新整理"
+          >
+            {state.loading
+              ? <Loader2 size={14} className="ns-spin" />
+              : <RefreshCw size={14} />
+            }
+          </button>
+          <a
+            href={source.externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ns-ext-link"
+            title={`前往 ${source.labelFull}`}
+          >
+            <ExternalLink size={13} />
+          </a>
+        </div>
+      </div>
+
+      {/* 內容區 */}
+      <div className="ns-block-body">
+        {state.loading ? (
+          <div className="ns-skeleton-list">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="ns-skeleton-row">
+                <div className="ns-skeleton-badge" />
+                <div className="ns-skeleton-title" style={{ width: `${60 + i * 6}%` }} />
+              </div>
+            ))}
+          </div>
+        ) : state.error ? (
+          <div className="ns-error-box">
+            <AlertCircle size={16} />
+            <span>{state.error}</span>
+          </div>
+        ) : state.items.length === 0 ? (
+          <div className="ns-empty-box">暫無資料，請稍後重試</div>
+        ) : (
+          <ul className="ns-item-list">
+            {state.items.map((item, idx) => {
+              const catStyle = getCategoryStyle(item.category);
+              const isJin10 = source.key === 'jin10';
+              return (
+                <li key={`${source.key}-${idx}`} className="ns-item" style={{ '--hover-bg': source.accentBg } as React.CSSProperties}>
+                  <a
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ns-item-link"
+                  >
+                    {/* 左側：序號 + 分類徽章 */}
+                    <div className="ns-item-left">
+                      <span className="ns-item-no">{idx + 1}</span>
+                      {item.category && item.category !== 'other' && (
+                        <span
+                          className="ns-cat-badge"
+                          style={{ background: catStyle.bg, color: catStyle.text }}
+                        >
+                          {item.category.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 中間：標題 + 翻譯 + 摘要 */}
+                    <div className="ns-item-content">
+                      <span
+                        className="ns-item-title"
+                        style={{ '--link-hover': source.titleHoverColor } as React.CSSProperties}
+                      >
+                        {isJin10 ? (item.snippet || item.title) : item.title}
+                      </span>
+                      {!isJin10 && item.translated_title && item.translated_title !== item.title && (
+                        <span className="ns-item-translated">{item.translated_title}</span>
+                      )}
+                      {!isJin10 && item.snippet && (
+                        <span className="ns-item-snippet">{item.snippet}</span>
+                      )}
+                    </div>
+
+                    {/* 右側：來源 + 時間 */}
+                    <div className="ns-item-right">
+                      {!isJin10 && item.source && (
+                        <span
+                          className="ns-source-pill"
+                          style={{ background: source.color + '1a', color: source.color, border: `1px solid ${source.color}33` }}
+                        >
+                          {item.source.replace(`${source.label} `, '').replace(source.labelFull, '').trim() || item.source}
+                        </span>
+                      )}
+                      <span className="ns-item-date">{formatDate(item.pubDate)}</span>
+                    </div>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+// ── 主頁面 ────────────────────────────────────────────────────────────
+const NewsPage: React.FC = () => {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refreshAll = () => setRefreshKey(k => k + 1);
+
+  return (
+    <div className="ns-page">
+      {/* Header */}
+      <div className="ns-page-header">
         <Link to="/" className="back-link">
           <ArrowLeft size={20} />
           返回監控首頁
         </Link>
-        <h1 className="news-page-title">📰 最新財經消息</h1>
-        <p className="news-page-subtitle">
-          整合 CNN、路透、NHK 等國際財經消息，以及金十數據和 TWSE ETF 公告的快速連結。
+        <div className="ns-page-title-row">
+          <h1 className="ns-page-title">📡 最新消息追蹤</h1>
+          <button className="ns-refresh-all-btn" onClick={refreshAll}>
+            <RefreshCw size={15} />
+            全部重新整理
+          </button>
+        </div>
+        <p className="ns-page-subtitle">
+          即時監控 CNN、路透社、NHK、金十數據 — 四大國際財經資訊同步呈現
         </p>
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      {/* AI Assistant */}
+      <div style={{ marginBottom: '1.5rem' }}>
         <AIAssistantWidget symbol="Macro" />
       </div>
 
-      {/* Quick Links */}
-      <h2 className="news-section-title">🔗 快速連結</h2>
-      <div className="quick-links-grid">
-        {QUICK_LINKS.map((link) => (
+      {/* 快速連結列 */}
+      <div className="ns-quick-bar">
+        {NEWS_SOURCES.map(src => (
           <a
-            key={link.name}
-            href={link.url}
+            key={src.key}
+            href={src.externalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="quick-link-card"
-            style={{ borderLeftColor: link.color }}
+            className="ns-quick-chip"
+            style={{ '--chip-color': src.color } as React.CSSProperties}
           >
-            <span className="quick-link-icon">{link.icon}</span>
-            <span className="quick-link-name">{link.name}</span>
-            <ExternalLink size={14} className="quick-link-ext" />
+            <span>{src.icon}</span>
+            <span>{src.labelFull}</span>
+            <ExternalLink size={11} />
           </a>
         ))}
+        <a
+          href="https://www.twse.com.tw/zh/ETFortune/announcementList"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ns-quick-chip"
+          style={{ '--chip-color': '#003d79' } as React.CSSProperties}
+        >
+          <span>🏛️</span>
+          <span>TWSE ETF 公告</span>
+          <ExternalLink size={11} />
+        </a>
       </div>
 
-      {/* RSS Feed */}
-      <div className="news-feed-header">
-        <h2 className="news-section-title">
-          <Rss size={20} />
-          RSS 新聞串流
-        </h2>
-        <button className="news-refresh-btn" onClick={fetchFeeds} disabled={loading}>
-          <RefreshCw size={16} className={loading ? 'spin' : ''} />
-          重新整理
-        </button>
+      {/* 四大新聞區塊 */}
+      <div className="ns-grid" key={refreshKey}>
+        {NEWS_SOURCES.map(source => (
+          <NewsSection key={source.key} source={source} />
+        ))}
       </div>
-
-      {loading ? (
-        <div className="news-loading">正在載入新聞...</div>
-      ) : error ? (
-        <div className="news-error">{error}</div>
-      ) : (
-        <div className="news-feed-list">
-          {feedItems.map((item, i) => (
-            <a
-              key={`${item.source}-${i}`}
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="news-feed-item"
-            >
-              <span className="news-source-badge" style={{ background: item.sourceColor }}>
-                {item.source}
-              </span>
-              <span className="news-item-title">{item.title}</span>
-              <span className="news-item-date">{formatDate(item.pubDate)}</span>
-            </a>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

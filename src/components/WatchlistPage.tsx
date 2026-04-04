@@ -20,41 +20,7 @@ interface WatchlistPageProps {
   onStocksChange: (stocks: WatchlistStock[]) => void;
 }
 
-/**
- * Parse the ISIN HTML table from TWSE to extract stock codes and names.
- * The table contains rows with: ISIN, 代號, 名稱, 上市日, 市場, 產業, CFI
- * We only want rows where the code is a pure number (stock, not ETF/warrant/etc).
- */
-function parseIsinHtml(html: string): StockEntry[] {
-  const results: StockEntry[] = [];
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const rows = doc.querySelectorAll('table.h4 tr');
-
-  for (const row of rows) {
-    const cells = row.querySelectorAll('td');
-    if (cells.length < 3) continue;
-
-    // Column 0 = "有價證券代號及名稱" (format: "2330　台積電")
-    const codeNameText = cells[0]?.textContent?.trim() || '';
-    // Column 4 = 備註 category
-
-    // Parse "2330　台積電" format (separated by full-width space or tab)
-    const match = codeNameText.match(/^(\d{4,6})\s+(.+)$/);
-    if (match) {
-      const code = match[1];
-      const name = match[2].trim();
-      // Only include 4-digit codes (regular stocks) and 6-digit ETFs
-      if (/^\d{4,6}$/.test(code)) {
-        results.push({ code, name });
-      }
-    }
-  }
-
-  return results;
-}
-
-/** Fetch and cache the complete stock list from TWSE ISIN */
+/** Fetch and cache the complete stock list from TWSE OpenAPI */
 let stockListCache: StockEntry[] | null = null;
 let stockListPromise: Promise<StockEntry[]> | null = null;
 
@@ -64,36 +30,24 @@ async function fetchStockList(): Promise<StockEntry[]> {
 
   stockListPromise = (async () => {
     try {
-      const res = await fetch('/api/isin/isin/C_public.jsp?strMode=2');
+      // 透過 vite proxy 抓取證交所 OpenAPI `STOCK_DAY_ALL` (收盤每日統計)
+      // 回傳格式為 JSON 陣列： [{ Code: '2330', Name: '台積電', ... }]
+      const res = await fetch('/api/twse-open/v1/exchangeReport/STOCK_DAY_ALL');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const html = await res.text();
-      const list = parseIsinHtml(html);
+      const data = await res.json();
+      
+      const list: StockEntry[] = [];
+      for (const item of data) {
+        if (item.Code && item.Name) {
+           list.push({ code: item.Code, name: item.Name });
+        }
+      }
       stockListCache = list;
       return list;
     } catch (err) {
       console.error('Failed to fetch stock list:', err);
-      // Fallback: try MOPS CSV
-      try {
-        const csvRes = await fetch('/api/mops/opendata/t187ap03_L.csv');
-        if (csvRes.ok) {
-          const text = await csvRes.text();
-          const lines = text.split('\n').slice(1); // skip header
-          const list: StockEntry[] = [];
-          for (const line of lines) {
-            const cols = line.split(',');
-            if (cols.length >= 3) {
-              const code = cols[0]?.replace(/"/g, '').trim();
-              const name = cols[1]?.replace(/"/g, '').trim();
-              if (/^\d{4,6}$/.test(code) && name) {
-                list.push({ code, name });
-              }
-            }
-          }
-          stockListCache = list;
-          return list;
-        }
-      } catch { /* fallback also failed */ }
-
+      // 清除 promise 讓下次可以重試
+      stockListPromise = null;
       return [];
     }
   })();

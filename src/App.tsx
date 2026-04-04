@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Star, Newspaper } from 'lucide-react';
+import { Activity, LayoutDashboard, Star, Newspaper, Settings } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import LayoutSettings, { type WidgetConfig } from './components/LayoutSettings';
 import CustomWatchlist from './components/CustomWatchlist';
@@ -60,6 +60,7 @@ function DashboardPage({
   setConfigs: (c: WidgetConfig[]) => void;
   watchlist: WatchlistStock[];
 }) {
+  const [showSettings, setShowSettings] = useState(false);
   const intervals = [
     { label: '當日走勢', value: '5' },
     { label: '日線', value: 'D' },
@@ -82,6 +83,14 @@ function DashboardPage({
               {itm.label}
             </button>
           ))}
+          <button
+            className={`control-btn settings-toggle ${showSettings ? 'active' : ''}`}
+            onClick={() => setShowSettings(!showSettings)}
+            title="自訂排版與位置"
+            style={{ marginLeft: '8px' }}
+          >
+            <Settings size={16} />
+          </button>
         </div>
       </div>
 
@@ -114,7 +123,7 @@ function DashboardPage({
           </section>
         </div>
 
-        <LayoutSettings configs={configs} onConfigChange={setConfigs} />
+        {showSettings && <LayoutSettings configs={configs} onConfigChange={setConfigs} />}
       </div>
     </>
   );

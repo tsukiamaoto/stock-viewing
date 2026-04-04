@@ -4,17 +4,14 @@
 
 ## 🛠 技術棧 (Tech Stack)
 
-### 前端 (Frontend)
-*   **核心框架:** React 19, TypeScript
-*   **建構與開發工具:** Vite, ESLint
-*   **路由管理:** React Router DOM (v7)
-*   **UI 系統與樣式:** Material UI (MUI), Emotion, 原生 CSS
-*   **圖示庫:** Lucide React, MUI Icons Material
-
-### 後端 (Backend)
-*   **框架:** Python FastAPI + Uvicorn
-*   **AI 分類:** Google Gemini API (`gemini-1.5-flash`)
-*   **新聞來源:** RSS (`feedparser`) + yfinance
+### 核心框架與工具
+*   **前端:** React 19, TypeScript, Vite, React Router DOM (v7)
+*   **UI 系統:** Material UI (MUI), Emotion, 原生 CSS, Lucide React
+*   **後端:** Python FastAPI + Uvicorn
+*   **背景任務:** APScheduler (背景定時定時器)
+*   **資料庫與服務:** Supabase (PostgreSQL 雲端資料庫)
+*   **AI 整合:** Google Gemini API (`gemini-1.5-flash`), 用於新聞分類與摘要
+*   **爬蟲資料源:** RSS (`feedparser`), yfinance, Google API (網頁翻譯器)
 
 ## 🏛 系統架構 (System Architecture)
 
@@ -28,22 +25,27 @@
 │  │   ├── FearGreedIndex       (alternative.me API)    │
 │  │   └── Dashboard            (TradingView Widgets)   │
 │  ├── WatchlistPage (自選股管理, TWSE ISIN)             │
-│  └── NewsPage      (RSS 新聞, AI 摘要)                │
+│  └── NewsPage      (直接連線 Supabase / FastAPI)       │
 │                                                       │
 │  Shared Hooks / Components:                           │
 │  ├── hooks/usePolling.ts           (計時器輪詢)        │
 │  ├── hooks/useTradingViewWidget.ts (TV 圖表嵌入)      │
 │  └── components/shared/PriceChangeDisplay.tsx         │
 └────────────────────────┬──────────────────────────────┘
-                         │ REST API (localhost:8000)
+                         │ REST API (localhost:8000) / Supabase REST
 ┌────────────────────────▼──────────────────────────────┐
 │                   FastAPI Backend                     │
-│  main.py                                              │
-│  ├── GET /api/news/latest?symbol=Macro               │
-│  │   └── news_crawler.py (RSS + yfinance)             │
+│  main.py (apscheduler 每分鐘背景爬取)                    │
+│  ├── GET /api/news/latest (從 Supabase 快速讀取)       │
+│  │   └── news_crawler.py (RSS + yfinance + CNN)       │
 │  └── GET /api/news/categorize/{symbol}               │
 │      ├── news_crawler.py                              │
 │      └── llm_classifier.py (Gemini API)              │
+└────────────────────────┬──────────────────────────────┘
+                         │ 寫入 / 讀取
+┌────────────────────────▼──────────────────────────────┐
+│                 Supabase (Database)                   │
+│  Table: news (自動翻譯的標題, 新聞摘要片段, 來源等)        │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -82,32 +84,55 @@ cp backend/.env.example backend/.env
 | `FRONTEND_URLS` | 允許 CORS 的前端 URL，逗號分隔 | `http://localhost:5173,http://localhost:5174` |
 | `API_HOST` | 後端監聽的 Host | `0.0.0.0` |
 | `API_PORT` | 後端監聽的 Port | `8000` |
+| `VITE_SUPABASE_URL` | Supabase 專案 URL | `https://xxxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Server 端用私鑰 (具寫入權限) | `eyJhbG...` |
 
 > [!IMPORTANT]
 > `GEMINI_API_KEY` 為啟動 AI 新聞分類功能的必要條件。未填寫時系統會自動退回至本地關鍵字分類器 (mock fallback)，其他功能不受影響。
 
-## 🚀 快速開始 (Getting Started)
+## 🚀 開發與啟動方式 (Development & Getting Started)
 
-### 1. 安裝並啟動前端
+後續開發版本依賴 Supabase 與定時任務，強烈建議**同時啟動後端與前端**以取得完整功能與即時新聞資料。
 
-```bash
-npm install
-cp .env.example .env   # 依需求修改環境變數
-npm run dev
-```
+### 1. 啟動後端 API (FastAPI)
 
-### 2. 啟動後端 (選用，新聞功能需要)
+後端負責每分鐘在背景定時抓取並翻譯新聞，同時寫入至 Supabase。
 
 ```bash
 cd backend
+
+# 建立並啟動虛擬環境 (Windows)
 python -m venv venv
-venv\Scripts\activate  # Windows
+venv\Scripts\activate
+# (Mac/Linux 使用: source venv/bin/activate)
+
+# 安裝所需套件
 pip install -r requirements.txt
-cp .env.example .env   # 填入 GEMINI_API_KEY
-python main.py
+
+# 複製環境變數範本並填入必要金鑰 (重點: SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY)
+cp .env.example .env
+
+# 啟動 FastAPI 伺服器 (附帶熱重載 hot-reload 開發模式)
+uvicorn main:app --reload
+```
+*(後端啟動後會預設運行於 http://localhost:8000，並自動開啟背景爬蟲與 API 服務)*
+
+### 2. 啟動前端 UI (React + Vite)
+
+請開啟**另一個**新的終端機視窗，並回到專案根目錄：
+
+```bash
+# 安裝前端依賴
+npm install
+
+# 複製環境變數範本 (需確認 VITE_SUPABASE_URL 等參數)
+cp .env.example .env
+
+# 啟動 Vite 開發伺服器
+npm run dev
 ```
 
-### 3. 建置正式環境版本
+### 3. 建置打包 (Production Build)
 
 ```bash
 npm run build
