@@ -1,4 +1,5 @@
 import React, { useState, memo } from 'react';
+import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { usePolling } from '../hooks/usePolling';
 import { getPriceColorClass, PriceChangeIcon } from './shared/PriceChangeDisplay';
@@ -128,9 +129,9 @@ const CustomWatchlist: React.FC<CustomWatchlistProps> = ({ stocks }) => {
                   <tr key={stock.code} className={`stock-row stock-${d1dir}`}>
                     <td><span className="wl-code-badge">{stock.code}</span></td>
                     <td className="stock-name">
-                      <a href={`https://norway.twsthr.info/StockHolders.aspx?stock=${stock.code}`} target="_blank" rel="noreferrer" title="查看股東持有數" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
-                        {stock.name} ↗
-                      </a>
+                      <Link to={`/stock/${stock.code}`} title="查看個股詳細資料" className="stock-detail-link">
+                        {stock.name} →
+                      </Link>
                     </td>
                     <td className="text-right stock-price">{stock.price}</td>
                     <td className="text-right">

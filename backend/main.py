@@ -15,6 +15,8 @@ from news_crawler import (
 )
 from llm_classifier import categorize_news_with_llm
 from quotes_api import router as quotes_router
+from stock_detail_api import router as stock_detail_router
+from shareholders_api import router as shareholders_router
 
 def scheduled_crawl_task():
     print("[Scheduler] 啟動每分鐘定時爬蟲任務...")
@@ -46,6 +48,8 @@ app.add_middleware(
 )
 
 app.include_router(quotes_router, prefix="/api/stocks", tags=["stocks"])
+app.include_router(stock_detail_router, prefix="/api/stocks", tags=["stock-detail"])
+app.include_router(shareholders_router, prefix="/api/stocks", tags=["shareholders"])
 
 @app.get("/api/news/latest")
 def get_latest_news(symbol: str = "Macro"):

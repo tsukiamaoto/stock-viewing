@@ -8,6 +8,7 @@ import FearGreedIndex from './components/FearGreedIndex';
 import TaiwanMarketSection from './components/TaiwanFuturesWidget';
 import WatchlistPage from './components/WatchlistPage';
 import NewsPage from './components/NewsPage';
+import StockDetailPage from './components/StockDetailPage';
 import type { WatchlistStock } from './components/WatchlistPage';
 import './index.css';
 
@@ -176,6 +177,7 @@ function App() {
                 <WatchlistPage stocks={watchlist} onStocksChange={setWatchlist} />
               } />
               <Route path="/news" element={<NewsPage />} />
+              <Route path="/stock/:code" element={<StockDetailPage />} />
             </Routes>
           </main>
         </div>
