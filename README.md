@@ -148,6 +148,23 @@ npm run dev
 npm run build
 ```
 
+### 4. 強制關閉背景後端 (Kill Backend Process)
+
+如果在開發過程中遇到啟動埠號衝突 (Port commonly 8000 already in use)，或是 `uvicorn` 後端卡滯 (Zombie Process) 無法透過 `Ctrl+C` 正常終止的情況，可以執行以下指令**專門強制擊殺後端**。
+
+**Windows (命令提示字元 / PowerShell):**
+```bash
+taskkill -F -IM python.exe -T
+taskkill -F -IM uvicorn.exe -T
+```
+
+**Mac / Linux:**
+```bash
+pkill -f uvicorn
+# 或
+pkill -f python
+```
+
 ## 📁 專案目錄結構
 
 ```text
