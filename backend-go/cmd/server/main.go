@@ -58,6 +58,9 @@ func main() {
 	} else {
 		scheduler.Start()
 		fmt.Printf("[Scheduler] 排程器已啟動，設定為每 %d 分鐘執行一次爬取。\n", cfg.CrawlerIntervalMinutes)
+
+		// Trigger the first run asynchronously so we don't have an empty DB on initial startup
+		go service.ScheduledCrawlTask()
 	}
 
 	// ── 5. Start HTTP server with graceful shutdown ──────────────

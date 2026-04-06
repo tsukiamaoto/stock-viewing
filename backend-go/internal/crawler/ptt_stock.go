@@ -73,15 +73,29 @@ func FetchPTTStockRealtime() []map[string]interface{} {
 			pBody, e := FetchURL(link, map[string]string{"Cookie": "over18=1"})
 			var snippet string
 			var comments []map[string]string // Store comments
+			var pubDateStr = time.Now().UTC().Format(time.RFC3339)
 			if e == nil {
 				pDoc, e2 := goquery.NewDocumentFromReader(strings.NewReader(string(pBody)))
 				if e2 == nil {
+					// Time extract
+					pDoc.Find(".article-meta-value").Each(func(i int, s *goquery.Selection) {
+						if i == 3 {
+							ptTimeStr := strings.TrimSpace(s.Text())
+							loc, _ := time.LoadLocation("Asia/Taipei")
+							// PTT uses Mon Jan  2 15:04:05 2006
+							t, err := time.ParseInLocation("Mon Jan 2 15:04:05 2006", strings.ReplaceAll(ptTimeStr, "  ", " "), loc)
+							if err == nil {
+								pubDateStr = t.UTC().Format(time.RFC3339)
+							}
+						}
+					})
+
 					mainContent := pDoc.Find("#main-content").Clone()
 					
 					// Extract comments first before removing them!
 					mainContent.Find(".push").Each(func(i int, s *goquery.Selection) {
-						if len(comments) >= 5 {
-							return // Only take top 5 comments
+						if len(comments) >= 100 {
+							return // Allow up to 100 comments instead of 5
 						}
 						pushUserId := strings.TrimSpace(s.Find(".push-userid").Text())
 						pushContent := strings.TrimSpace(s.Find(".push-content").Text())
@@ -113,7 +127,7 @@ func FetchPTTStockRealtime() []map[string]interface{} {
 				"category":        author, // Repurpose category for author in the feed
 				"source":          "PTT 股版",
 				"sourceColor":     "#2c2c2c",
-				"pubDate":         time.Now().UTC().Format(time.RFC3339),
+				"pubDate":         pubDateStr,
 				"comments":        comments,
 			})
 			mu.Unlock()

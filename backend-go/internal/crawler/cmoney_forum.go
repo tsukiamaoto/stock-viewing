@@ -1,68 +1,98 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/chromedp/chromedp"
 )
 
-// FetchCMoneyRealtime dynamically generates mock CMoney Facebook-style feed posts.
-// Because CMoney API requires login cookies and blocks scraping, we use this 
-// realistic simulation to demonstrate the Facebook Feed UI layout with Comments.
+// FetchCMoneyRealtime uses headless Chrome to bypass Nuxt rendering and fetch real posts for a given symbol.
 func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
+	var allPosts []map[string]interface{}
 	symbolList := strings.Split(symbols, ",")
-	if len(symbolList) == 0 || symbolList[0] == "" {
-		return []map[string]interface{}{}
-	}
 
-	var items []map[string]interface{}
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+	// limit entire crawler loop
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
-	// Generate realistic mockup posts for each symbol
-	for _, sym := range symbolList {
-		sym = strings.TrimSpace(sym)
-		if sym == "" {
+	for _, symbol := range symbolList {
+		symbol = strings.TrimSpace(symbol)
+		if symbol == "" {
 			continue
 		}
 
-		// A positive post
-		items = append(items, map[string]interface{}{
-			"title":            fmt.Sprintf("買進 %s 就對了！大家抱緊！", sym),
-			"translated_title": fmt.Sprintf("買進 %s 就對了！大家抱緊！", sym),
-			"snippet":          fmt.Sprintf("我認為 %s 接下來的營收絕對會創新高。外資已經連買三天了，籌碼面超級乾淨，目標價上看 20%% 空間，大家不要被洗下車啊！\n\n#%s向上衝", sym, sym),
-			"original_content": "",
-			"link":             "https://www.cmoney.tw/forum/stock/" + sym,
-			"category":         "多頭總司令", // Author
-			"source":           "股市爆料同學會",
-			"sourceColor":      "#f7931e",
-			"pubDate":          time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
-			"comments": []map[string]string{
-				{"author": "散戶韭菜", "content": "大哥是對的！我昨天剛上車！"},
-				{"author": "看空外資", "content": "小心倒貨...我先獲利了結了。"},
-				{"author": "存股達人", "content": "這檔當存股也是很安心，抱緊處理。"},
-			},
-		})
+		var res string
+		url := "https://www.cmoney.tw/forum/stock/" + symbol
 
-		// A bearish or neutral post
-		// random factor so it looks somewhat dynamic
-		if rand.Intn(2) == 0 {
-			items = append(items, map[string]interface{}{
-				"title":            fmt.Sprintf("有人知道 %s 為什麼今天跌嗎？", sym),
-				"translated_title": fmt.Sprintf("有人知道 %s 為什麼今天跌嗎？", sym),
-				"snippet":          fmt.Sprintf("昨天利多出來，今天 %s 卻開高走低，是主力在出貨嗎？有沒有高手可以分析一下籌碼面的狀況，我套在山頂好冷啊...", sym),
-				"original_content": "",
-				"link":             "https://www.cmoney.tw/forum/stock/" + sym,
-				"category":         "套房學長", // Author
-				"source":           "股市爆料同學會",
-				"sourceColor":      "#f7931e",
-				"pubDate":          time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339),
-				"comments": []map[string]string{
-					{"author": "技術分析師", "content": "KD死亡交叉了，建議反彈先減碼。"},
-					{"author": "波段大師", "content": "這邊是逢低買進的好機會，準備分批建倉。"},
-				},
-			})
+		err := chromedp.Run(ctx,
+			chromedp.Navigate(url),
+			chromedp.Sleep(2 * time.Second), // Allow initial load
+			chromedp.Evaluate(`window.scrollTo(0, document.body.scrollHeight / 2);`, nil),
+			chromedp.Sleep(1 * time.Second),
+			chromedp.Evaluate(`window.scrollTo(0, document.body.scrollHeight);`, nil),
+			chromedp.Sleep(2 * time.Second), // Allow lazy load XHR
+			chromedp.Evaluate(`
+				Array.from(document.querySelectorAll('article, .article-card, [class*="article"]')).map(el => {
+					let title = el.querySelector('h3, .title, strong') ? el.querySelector('h3, .title, strong').innerText : '';
+					let content = el.querySelector('p, .content, .text') ? el.querySelector('p, .content, .text').innerText : el.innerText;
+					return title + "|||" + content;
+				}).join('###');
+			`, &res),
+		)
+		
+		if err != nil {
+			continue // skip on timeout or err
+		}
+
+		// parse pseudo json / separator string
+		blocks := strings.Split(res, "###")
+		count := 0
+		for _, b := range blocks {
+			if len(b) < 10 || count >= 30 {
+				continue
+			}
+			parts := strings.SplitN(b, "|||", 2)
+			title := ""
+			content := parts[0]
+			if len(parts) == 2 && parts[0] != "" {
+				title = strings.TrimSpace(parts[0])
+				content = strings.TrimSpace(parts[1])
+			}
+			
+			// Fallback title to first 20 chars of content if empty
+			if title == "" || title == "爆料討論" {
+				runes := []rune(content)
+				if len(runes) > 20 {
+					title = string(runes[:20]) + "..."
+				} else {
+					title = content
+				}
+			}
+			title = fmt.Sprintf("[%s] %s", symbol, title)
+			if len(content) > 300 {
+				content = string([]rune(content)[:300]) + "..."
+			}
+
+			post := map[string]interface{}{
+				"title":       title,
+				"link":        url,
+				"source":      "CMoney 同學會",
+				"sourceColor": "#f7931e",
+				"pubDate":     time.Now().Format(time.RFC3339),
+				"category":    "股友",
+				"snippet":     content,
+				"comments":    []map[string]string{}, // Can be expanded
+				"symbol":      symbol, // ADD SYMBOL HERE
+			}
+			allPosts = append(allPosts, post)
+			count++
 		}
 	}
 
-	return items
+	return allPosts
 }

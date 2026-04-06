@@ -46,7 +46,11 @@ const FeedCard: React.FC<FeedPostProps> = ({ post }) => {
 
       {/* Body: Title and Snippet */}
       <div className="feed-card-body">
-        <h3 className="feed-title">{post.title}</h3>
+        <a href={post.link} target="_blank" rel="noopener noreferrer" className="feed-title-link" style={{ textDecoration: 'none' }}>
+          <h3 className="feed-title" style={{ transition: 'color 0.2s', cursor: 'pointer' }} onMouseOver={(e) => e.currentTarget.style.color = '#3b82f6'} onMouseOut={(e) => e.currentTarget.style.color = ''}>
+            {post.title}
+          </h3>
+        </a>
         {post.snippet && <p className="feed-snippet">{post.snippet}</p>}
       </div>
 
@@ -98,10 +102,12 @@ export const ForumPage: React.FC = () => {
     return ['2330', '0050']; // Fallback
   };
 
+  const apiBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
   const fetchPtt = async () => {
     setLoadingPtt(true);
     try {
-      const res = await fetch('/api/news/ptt');
+      const res = await fetch(`${apiBase}/api/news/ptt`);
       const json = await res.json();
       if (json.data) setPttFeed(json.data);
     } catch (e) {
@@ -115,7 +121,7 @@ export const ForumPage: React.FC = () => {
     setLoadingCmoney(true);
     try {
       const symbols = getWatchlistSymbols().join(',');
-      const res = await fetch(`/api/news/cmoney?symbols=${symbols}`);
+      const res = await fetch(`${apiBase}/api/news/cmoney?symbols=${symbols}`);
       const json = await res.json();
       if (json.data) setCmoneyFeed(json.data);
     } catch (e) {
@@ -161,7 +167,21 @@ export const ForumPage: React.FC = () => {
             ) : cmoneyFeed.length === 0 ? (
               <div className="feed-empty">目前沒有追蹤股票的最新動態。</div>
             ) : (
-              cmoneyFeed.map((post, idx) => <FeedCard key={idx} post={post} />)
+              Object.entries(
+                cmoneyFeed.reduce((acc: any, post: any) => {
+                  const sym = post.symbol || '未分類';
+                  if (!acc[sym]) acc[sym] = [];
+                  acc[sym].push(post);
+                  return acc;
+                }, {})
+              ).map(([sym, posts]: [string, any]) => (
+                <div key={sym} className="cmoney-stock-group" style={{ marginBottom: '24px' }}>
+                  <div style={{ backgroundColor: '#fff', padding: '8px 16px', borderRadius: '8px', marginBottom: '12px', fontWeight: 'bold', color: '#1e293b', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderLeft: '4px solid #f7931e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📈 代號 {sym} 熱門討論
+                  </div>
+                  {posts.map((post: any, idx: number) => <FeedCard key={idx} post={post} />)}
+                </div>
+              ))
             )}
           </div>
         </div>

@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"stock-viewing-backend/internal/crawler"
 	"stock-viewing-backend/internal/database"
@@ -105,23 +107,58 @@ func getTwseEtfNews(c *gin.Context) {
 
 // GET /api/news/ptt
 func getPTTNews(c *gin.Context) {
-	// Call crawler directly for real-time fetch
-	items := crawler.FetchPTTStockRealtime()
-	res := gin.H{
-		"status": "success",
-		"data":   items,
-		"source": "PTT",
+	rows, err := database.GetNewsBySource("PTT", 50, 0)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "error", "message": err.Error(), "data": []interface{}{}})
+		return
 	}
-	c.JSON(http.StatusOK, res)
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   mapDBRowsToForumNews(rows),
+		"source": "PTT",
+	})
 }
 
 // GET /api/news/cmoney
 func getCMoneyNews(c *gin.Context) {
 	symbols := c.DefaultQuery("symbols", "")
-	items := crawler.FetchCMoneyRealtime(symbols)
+	isNew := service.RegisterWatchlistSymbols(symbols)
+
+	// If this is the first time these symbols are requested, fetch them synchronously right now 
+	// so the user doesn't see an empty page and have to wait for the next cron interval.
+	if isNew {
+		items := crawler.FetchCMoneyRealtime(symbols)
+		service.SaveForumToSupabase(items)
+	}
+
+	rows, err := database.GetNewsBySource("CMoney", 200, 0)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "error", "message": err.Error(), "data": []interface{}{}})
+		return
+	}
+
+	allForums := mapDBRowsToForumNews(rows)
+	
+	var filtered []gin.H
+	symbolList := strings.Split(symbols, ",")
+	symMap := make(map[string]bool)
+	for _, s := range symbolList {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			symMap[s] = true
+		}
+	}
+	
+	for _, f := range allForums {
+		sym, ok := f["symbol"].(string)
+		if ok && (len(symMap) == 0 || symMap[sym]) {
+			filtered = append(filtered, f)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   items,
+		"data":   filtered,
 		"source": "CMoney股市爆料同學會",
 	})
 }
@@ -136,6 +173,32 @@ func getNewsBySource(keyword string, limit int, offset int) gin.H {
 		return gin.H{"status": "error", "message": err.Error(), "data": []interface{}{}}
 	}
 	return gin.H{"status": "success", "data": mapDBRowsToNews(rows)}
+}
+
+func mapDBRowsToForumNews(rows []map[string]interface{}) []gin.H {
+	result := make([]gin.H, 0, len(rows))
+	for _, row := range rows {
+		commentsStr := getStr(row, "content")
+		var comments []map[string]string
+		if len(commentsStr) > 0 {
+			_ = json.Unmarshal([]byte(commentsStr), &comments)
+		}
+		
+		result = append(result, gin.H{
+			"title":            getStr(row, "title"),
+			"translated_title": getStr(row, "translated_title"),
+			"snippet":          getStr(row, "translated_content"),
+			"original_content": getStr(row, "translated_content"),
+			"category":         getStr(row, "category"),
+			"link":             getStr(row, "link"),
+			"source":           getStr(row, "source"),
+			"sourceColor":      getStr(row, "sourceColor"),
+			"pubDate":          getStr(row, "published_at"),
+			"comments":         comments,
+			"symbol":           getStr(row, "image_url"),
+		})
+	}
+	return result
 }
 
 func mapDBRowsToNews(rows []map[string]interface{}) []gin.H {
