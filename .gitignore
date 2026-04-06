@@ -23,10 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 
-# Python & Backend
-backend/venv/
-venv/
-__pycache__/
-*.pyc
+# Root Environment Variables
 .env
-backend/.env
+
+# Go Backend
+backend-go/.env
+backend-go/server.exe
+backend-go/server
+backend-go/air.exe
+backend-go/tmp/
+backend-go/build-errors.log
+backend-go/.gopath/
+backend-go/vendor/
