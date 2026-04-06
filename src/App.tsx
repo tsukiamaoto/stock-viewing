@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Star, Newspaper, Settings } from 'lucide-react';
+import { Activity, LayoutDashboard, Star, Newspaper, Settings, MessagesSquare } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import LayoutSettings, { type WidgetConfig } from './components/LayoutSettings';
 import CustomWatchlist from './components/CustomWatchlist';
@@ -9,6 +9,7 @@ import TaiwanMarketSection from './components/TaiwanFuturesWidget';
 import WatchlistPage from './components/WatchlistPage';
 import NewsPage from './components/NewsPage';
 import StockDetailPage from './components/StockDetailPage';
+import { ForumPage } from './components/ForumPage';
 import type { WatchlistStock } from './components/WatchlistPage';
 import './index.css';
 
@@ -47,6 +48,10 @@ function NavSidebar() {
       <Link to="/news" className={`nav-item ${location.pathname === '/news' ? 'active' : ''}`}>
         <Newspaper size={18} />
         <span>最新消息追蹤</span>
+      </Link>
+      <Link to="/forum" className={`nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
+        <MessagesSquare size={18} />
+        <span>社群論壇討論</span>
       </Link>
     </nav>
   );
@@ -178,6 +183,7 @@ function App() {
                 <WatchlistPage stocks={watchlist} onStocksChange={setWatchlist} />
               } />
               <Route path="/news" element={<NewsPage />} />
+              <Route path="/forum" element={<ForumPage />} />
               <Route path="/stock/:code" element={<StockDetailPage />} />
             </Routes>
           </main>

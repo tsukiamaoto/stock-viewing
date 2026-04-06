@@ -2,7 +2,9 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
+	"stock-viewing-backend/internal/crawler"
 	"stock-viewing-backend/internal/database"
 	"stock-viewing-backend/internal/llm"
 	"stock-viewing-backend/internal/model"
@@ -19,11 +21,17 @@ func RegisterNewsRoutes(rg *gin.RouterGroup) {
 	rg.GET("/reuters", getReutersNews)
 	rg.GET("/nhk", getNHKNews)
 	rg.GET("/jin10", getJin10News)
+	rg.GET("/twse-etf", getTwseEtfNews)
+	rg.GET("/ptt", getPTTNews)
+	rg.GET("/cmoney", getCMoneyNews)
 }
 
 // GET /api/news/latest
 func getLatestNews(c *gin.Context) {
-	rows, err := database.GetLatestNews(50)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	
+	rows, err := database.GetLatestNews(limit, offset)
 	if err != nil {
 		c.JSON(http.StatusOK, model.NewError(err.Error()))
 		return
@@ -52,38 +60,78 @@ func categorizeNews(c *gin.Context) {
 
 // GET /api/news/cnn
 func getCNNNews(c *gin.Context) {
-	res := getNewsBySource("CNN", 15)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	res := getNewsBySource("CNN", limit, offset)
 	res["source"] = "CNN"
 	c.JSON(http.StatusOK, res)
 }
 
 // GET /api/news/reuters
 func getReutersNews(c *gin.Context) {
-	res := getNewsBySource("Reuters", 15)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	res := getNewsBySource("Reuters", limit, offset)
 	res["source"] = "Reuters"
 	c.JSON(http.StatusOK, res)
 }
 
 // GET /api/news/nhk
 func getNHKNews(c *gin.Context) {
-	res := getNewsBySource("NHK", 15)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	res := getNewsBySource("NHK", limit, offset)
 	res["source"] = "NHK"
 	c.JSON(http.StatusOK, res)
 }
 
 // GET /api/news/jin10
 func getJin10News(c *gin.Context) {
-	res := getNewsBySource("金十", 15)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	res := getNewsBySource("金十", limit, offset)
 	res["source"] = "Jin10"
 	c.JSON(http.StatusOK, res)
+}
+
+// GET /api/news/twse-etf
+func getTwseEtfNews(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	res := getNewsBySource("TWSE", limit, offset) // The keyword should match a substring of Source
+	res["source"] = "TWSE ETF"
+	c.JSON(http.StatusOK, res)
+}
+
+// GET /api/news/ptt
+func getPTTNews(c *gin.Context) {
+	// Call crawler directly for real-time fetch
+	items := crawler.FetchPTTStockRealtime()
+	res := gin.H{
+		"status": "success",
+		"data":   items,
+		"source": "PTT",
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+// GET /api/news/cmoney
+func getCMoneyNews(c *gin.Context) {
+	symbols := c.DefaultQuery("symbols", "")
+	items := crawler.FetchCMoneyRealtime(symbols)
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   items,
+		"source": "CMoney股市爆料同學會",
+	})
 }
 
 // ────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ────────────────────────────────────────────────────────────────────
 
-func getNewsBySource(keyword string, limit int) gin.H {
-	rows, err := database.GetNewsBySource(keyword, limit)
+func getNewsBySource(keyword string, limit int, offset int) gin.H {
+	rows, err := database.GetNewsBySource(keyword, limit, offset)
 	if err != nil {
 		return gin.H{"status": "error", "message": err.Error(), "data": []interface{}{}}
 	}

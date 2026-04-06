@@ -47,17 +47,17 @@ func authHeaders() map[string]string {
 // ────────────────────────────────────────────────────────────────────
 
 // GetLatestNews fetches the latest N news entries ordered by published_at DESC.
-func GetLatestNews(limit int) ([]map[string]interface{}, error) {
-	url := fmt.Sprintf("%s/news?select=*&order=published_at.desc&limit=%d", baseURL(), limit)
+func GetLatestNews(limit int, offset int) ([]map[string]interface{}, error) {
+	url := fmt.Sprintf("%s/news?select=*&order=published_at.desc&limit=%d&offset=%d", baseURL(), limit, offset)
 	return doGet(url)
 }
 
-// GetNewsBySource fetches news matching a source keyword (ILIKE).
-func GetNewsBySource(sourceKeyword string, limit int) ([]map[string]interface{}, error) {
+// GetNewsBySource fetches news matching a source keyword (ILIKE) with pagination.
+func GetNewsBySource(sourceKeyword string, limit int, offset int) ([]map[string]interface{}, error) {
 	// Encode the `%` characters to `%25` so Cloudflare's worker doesn't throw a URIError.
 	encodedPattern := url.QueryEscape("%" + sourceKeyword + "%")
-	u := fmt.Sprintf("%s/news?select=*&source=ilike.%s&order=published_at.desc&limit=%d",
-		baseURL(), encodedPattern, limit)
+	u := fmt.Sprintf("%s/news?select=*&source=ilike.%s&order=published_at.desc&limit=%d&offset=%d",
+		baseURL(), encodedPattern, limit, offset)
 	return doGet(u)
 }
 

@@ -7,12 +7,12 @@ import (
 	"stock-viewing-backend/internal/config"
 	"stock-viewing-backend/internal/crawler"
 	"stock-viewing-backend/internal/database"
-	"stock-viewing-backend/internal/llm"
 	"stock-viewing-backend/internal/model"
 )
 
 // ────────────────────────────────────────────────────────────────────
-// News Service — orchestrates crawler → LLM → database pipeline
+// News Service — orchestrates crawler → translate → database pipeline
+// Uses Google Translate (fast) instead of Gemini LLM for translation
 // ────────────────────────────────────────────────────────────────────
 
 // FetchMacroNews aggregates CNN, RSS (Reuters/NHK) and Jin10 news.
@@ -21,11 +21,24 @@ func FetchMacroNews() []model.NewsItem {
 		{URL: config.Cfg.CNNBusinessURL, Label: "Business"},
 		{URL: config.Cfg.CNNWorldURL, Label: "World"},
 	}
-	cnnNews := crawler.FetchCNNNews(sections, llm.EnhanceNewsWithLLM)
-	rssNews := crawler.FetchAllRSSNews(llm.EnhanceNewsWithLLM)
-	jin10News := crawler.FetchJin10News(llm.EnhanceNewsWithLLM)
-	
-	allNews := append(cnnNews, rssNews...)
+
+	// CNN & Reuters: English → Traditional Chinese
+	enToZhTW := EnhanceWithTranslate("en")
+	cnnNews := crawler.FetchCNNNews(sections, enToZhTW)
+
+	// Reuters & NHK via RSS: auto-detect language → Traditional Chinese
+	rssNews := crawler.FetchReutersNews(enToZhTW)
+	nhkNews := crawler.FetchNHKNews(EnhanceWithTranslate("ja"))
+	allRSS := append(rssNews, nhkNews...)
+
+	// Jin10: Simplified Chinese → Traditional Chinese (with prefix cleaning)
+	jin10News := crawler.FetchJin10News(EnhanceJin10)
+
+	// TWSE ETF: Naturally Traditional Chinese
+	twseNews := crawler.FetchTWSE_ETFNews(EnhanceWithTranslate("zh-TW"))
+
+	allNews := append(cnnNews, allRSS...)
+	allNews = append(allNews, twseNews...)
 	return append(allNews, jin10News...)
 }
 

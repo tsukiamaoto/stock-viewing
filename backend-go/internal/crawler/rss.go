@@ -42,8 +42,8 @@ func FetchRSSFromSources(sources []model.RSSSource, limitPerSource int, enhanceF
 			if count >= limitPerSource {
 				break
 			}
-			title := entry.Title
-			link := entry.Link
+			title := CleanText(entry.Title)
+			// CleanText now strips HTML tags, fixing Reuters' <a href="..."> issue
 			snippet := CleanText(entry.Description)
 
 			llm := enhanceFn(title, snippet)
@@ -71,7 +71,7 @@ func FetchRSSFromSources(sources []model.RSSSource, limitPerSource int, enhanceF
 			items = append(items, model.NewsItem{
 				Title:           title,
 				TranslatedTitle: translatedTitle,
-				Link:            link,
+				Link:            entry.Link,
 				Snippet:         translatedSnippet,
 				OriginalContent: snippet,
 				Category:        cat,
@@ -82,7 +82,22 @@ func FetchRSSFromSources(sources []model.RSSSource, limitPerSource int, enhanceF
 			count++
 		}
 	}
-	return items
+
+	// Deduplicate by title
+	return deduplicateByTitle(items)
+}
+
+// deduplicateByTitle removes duplicate news entries by title.
+func deduplicateByTitle(items []model.NewsItem) []model.NewsItem {
+	seen := make(map[string]bool)
+	unique := make([]model.NewsItem, 0, len(items))
+	for _, item := range items {
+		if !seen[item.Title] {
+			seen[item.Title] = true
+			unique = append(unique, item)
+		}
+	}
+	return unique
 }
 
 // FetchReutersNews fetches Reuters news from RSS.

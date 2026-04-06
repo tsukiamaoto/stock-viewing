@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"stock-viewing-backend/internal/model"
 
@@ -22,18 +23,18 @@ func FetchJin10News(enhanceFn func(string, string) model.LLMEnhanceResult) []mod
 	items := fetchJin10FlashAPI(enhanceFn)
 	if len(items) > 0 {
 		fmt.Printf("[Jin10] 共取得 %d 則快訊 (Flash API)\n", len(items))
-		return items
+		return deduplicateNews(items)
 	}
 
 	items = fetchJin10RSSHub(enhanceFn)
 	if len(items) > 0 {
 		fmt.Printf("[Jin10] 共取得 %d 則快訊 (RSSHub)\n", len(items))
-		return items
+		return deduplicateNews(items)
 	}
 
-	items = fetchJin10DirectScrape()
+	items = fetchJin10DirectScrape(enhanceFn)
 	fmt.Printf("[Jin10] 共取得 %d 則快訊 (Direct Scrape)\n", len(items))
-	return items
+	return deduplicateNews(items)
 }
 
 func fetchJin10FlashAPI(enhanceFn func(string, string) model.LLMEnhanceResult) []model.NewsItem {
@@ -75,7 +76,8 @@ func fetchJin10FlashAPI(enhanceFn func(string, string) model.LLMEnhanceResult) [
 			continue
 		}
 		content := extractJin10Content(m)
-		content = CleanText(content)
+		// Use CleanJin10Text to strip "分享收藏详情复制", timestamps, VIP tags
+		content = CleanJin10Text(content)
 		if len(content) < 5 {
 			continue
 		}
@@ -89,8 +91,9 @@ func fetchJin10FlashAPI(enhanceFn func(string, string) model.LLMEnhanceResult) [
 		}
 
 		titlePart := content
-		if len(titlePart) > 100 {
-			titlePart = titlePart[:100]
+		if utf8.RuneCountInString(titlePart) > 80 {
+			runes := []rune(titlePart)
+			titlePart = string(runes[:80])
 		}
 
 		llm := enhanceFn(titlePart, content)
@@ -154,8 +157,8 @@ func fetchJin10RSSHub(enhanceFn func(string, string) model.LLMEnhanceResult) []m
 			if i >= 20 {
 				break
 			}
-			title := CleanText(entry.Title)
-			content := CleanText(entry.Description)
+			title := CleanJin10Text(entry.Title)
+			content := CleanJin10Text(entry.Description)
 			if content == "" {
 				content = title
 			}
@@ -193,7 +196,7 @@ func fetchJin10RSSHub(enhanceFn func(string, string) model.LLMEnhanceResult) []m
 	return nil
 }
 
-func fetchJin10DirectScrape() []model.NewsItem {
+func fetchJin10DirectScrape(enhanceFn func(string, string) model.LLMEnhanceResult) []model.NewsItem {
 	fmt.Println("[Jin10] 改用直接爬取首頁快訊...")
 	body, err := FetchURL("https://www.jin10.com/", nil)
 	if err != nil {
@@ -210,27 +213,56 @@ func fetchJin10DirectScrape() []model.NewsItem {
 		if i >= 20 {
 			return
 		}
-		text := CleanText(s.Text())
-		if len(text) < 10 {
+		text := CleanJin10Text(s.Text())
+		if utf8.RuneCountInString(text) < 5 {
 			return
 		}
 		titlePart := text
-		if len(titlePart) > 100 {
-			titlePart = titlePart[:100]
+		if utf8.RuneCountInString(titlePart) > 80 {
+			runes := []rune(titlePart)
+			titlePart = string(runes[:80])
 		}
+		llm := enhanceFn(titlePart, text)
+		translatedTitle := llm.TranslatedTitle
+		if translatedTitle == "" {
+			translatedTitle = titlePart
+		}
+		snippet := llm.TranslatedSnippet
+		if snippet == "" {
+			snippet = text
+		}
+		cat := llm.Category
+		if cat == "" {
+			cat = "other"
+		}
+
 		items = append(items, model.NewsItem{
 			Title:           titlePart,
-			TranslatedTitle: titlePart,
+			TranslatedTitle: translatedTitle,
 			Link:            "https://www.jin10.com/",
-			Snippet:         text,
+			Snippet:         snippet,
 			OriginalContent: text,
 			PubDate:         time.Now().UTC().Format(time.RFC3339),
 			Source:          "金十數據",
 			SourceColor:     "#c8a000",
-			Category:        "other",
+			Category:        cat,
 		})
 	})
 	return items
+}
+
+// deduplicateNews removes duplicate entries by title.
+func deduplicateNews(items []model.NewsItem) []model.NewsItem {
+	seen := make(map[string]bool)
+	unique := make([]model.NewsItem, 0, len(items))
+	for _, item := range items {
+		key := item.Title
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, item)
+		}
+	}
+	return unique
 }
 
 func coalesce(vals ...string) string {

@@ -18,6 +18,9 @@ interface NewsItem {
 interface NewsSectionState {
   items: NewsItem[];
   loading: boolean;
+  loadingMore: boolean;
+  offset: number;
+  hasMore: boolean;
   error: string | null;
   lastUpdated: Date | null;
 }
@@ -80,6 +83,20 @@ const NEWS_SOURCES = [
     externalUrl: 'https://www.jin10.com/',
     titleHoverColor: '#9a7b00',
   },
+  {
+    key: 'twse-etf',
+    endpoint: '/api/news/twse-etf',
+    label: 'TWSE',
+    labelFull: '台灣證交所',
+    color: '#008c95',
+    accentBg: '#e0f7fa',
+    accentBorder: '#008c95',
+    accentHeader: 'linear-gradient(135deg, #008c95 0%, #005662 100%)',
+    icon: '📈',
+    desc: 'ETF e添富公告',
+    externalUrl: 'https://www.twse.com.tw/zh/ETFortune/announcementList',
+    titleHoverColor: '#005662',
+  },
 ];
 
 // ── 分類顏色對應 ─────────────────────────────────────────────────────
@@ -114,29 +131,53 @@ const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
   const [state, setState] = useState<NewsSectionState>({
     items: [],
     loading: true,
+    loadingMore: false,
+    offset: 0,
+    hasMore: true,
     error: null,
     lastUpdated: null,
   });
 
-  const fetchNews = useCallback(async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
+  const fetchNews = useCallback(async (isLoadMore = false) => {
+    if (isLoadMore) {
+        setState(prev => ({ ...prev, loadingMore: true, error: null }));
+    } else {
+        setState(prev => ({ ...prev, loading: true, error: null, offset: 0 }));
+    }
+
+    const currentOffset = isLoadMore ? state.offset + 15 : 0;
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     try {
-      const res = await fetch(`${apiBase}${source.endpoint}`);
+      const res = await fetch(`${apiBase}${source.endpoint}?limit=15&offset=${currentOffset}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.status === 'success' && json.data) {
-        setState({ items: json.data, loading: false, error: null, lastUpdated: new Date() });
+        setState(prev => ({ 
+            items: isLoadMore ? [...prev.items, ...json.data] : json.data, 
+            loading: false, 
+            loadingMore: false,
+            offset: currentOffset,
+            hasMore: json.data.length === 15,
+            error: null, 
+            lastUpdated: new Date() 
+        }));
       } else {
-        setState(prev => ({ ...prev, loading: false, error: json.message || '無資料' }));
+        setState(prev => ({ ...prev, loading: false, loadingMore: false, hasMore: false, error: json.message || '無資料' }));
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setState(prev => ({ ...prev, loading: false, error: msg }));
+      setState(prev => ({ ...prev, loading: false, loadingMore: false, error: msg }));
     }
-  }, [source.endpoint]);
+  }, [source.endpoint, state.offset]);
 
-  useEffect(() => { fetchNews(); }, [fetchNews]);
+  useEffect(() => { fetchNews(); }, [source.endpoint]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 50 && !state.loading && !state.loadingMore && state.hasMore) {
+      fetchNews(true);
+    }
+  };
 
   return (
     <div className="ns-block">
@@ -157,7 +198,7 @@ const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
           )}
           <button
             className="ns-refresh-btn"
-            onClick={fetchNews}
+            onClick={() => fetchNews(false)}
             disabled={state.loading}
             title="重新整理"
           >
@@ -179,7 +220,7 @@ const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
       </div>
 
       {/* 內容區 */}
-      <div className="ns-block-body">
+      <div className="ns-block-body" onScroll={handleScroll}>
         {state.loading ? (
           <div className="ns-skeleton-list">
             {[1, 2, 3, 4, 5].map(i => (
@@ -224,17 +265,37 @@ const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
 
                     {/* 中間：標題 + 翻譯 + 摘要 */}
                     <div className="ns-item-content">
-                      <span
-                        className="ns-item-title"
-                        style={{ '--link-hover': source.titleHoverColor } as React.CSSProperties}
-                      >
-                        {isJin10 ? (item.snippet || item.title) : item.title}
-                      </span>
-                      {!isJin10 && item.translated_title && item.translated_title !== item.title && (
-                        <span className="ns-item-translated">{item.translated_title}</span>
-                      )}
-                      {!isJin10 && item.snippet && (
-                        <span className="ns-item-snippet">{item.snippet}</span>
+                      {isJin10 ? (
+                        <>
+                          {/* Jin10: 翻譯後的繁體中文標題為主 */}
+                          <span
+                            className="ns-item-title"
+                            style={{ '--link-hover': source.titleHoverColor } as React.CSSProperties}
+                          >
+                            {item.translated_title || item.title}
+                          </span>
+                          {item.snippet && item.snippet !== item.translated_title && (
+                            <span className="ns-item-snippet">{item.snippet}</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* CNN/Reuters/NHK: 原文標題 */}
+                          <span
+                            className="ns-item-title"
+                            style={{ '--link-hover': source.titleHoverColor } as React.CSSProperties}
+                          >
+                            {item.title}
+                          </span>
+                          {/* 翻譯後的中文標題 */}
+                          {item.translated_title && item.translated_title !== item.title && (
+                            <span className="ns-item-translated">{item.translated_title}</span>
+                          )}
+                          {/* 翻譯後的中文摘要 */}
+                          {item.snippet && (
+                            <span className="ns-item-snippet">{item.snippet}</span>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -254,6 +315,19 @@ const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
                 </li>
               );
             })}
+            
+            {/* Loading More Indicator */}
+            {state.loadingMore && (
+              <div style={{ textAlign: 'center', padding: '10px 0', color: '#666' }}>
+                <Loader2 size={16} className="ns-spin" style={{ display: 'inline' }} /> 載入中...
+              </div>
+            )}
+            
+            {!state.hasMore && state.items.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '15px 0', fontSize: '0.8rem', color: '#999' }}>
+                已呈現所有資料
+              </div>
+            )}
           </ul>
         )}
       </div>

@@ -52,12 +52,63 @@ func FetchURL(url string, extraHeaders map[string]string) ([]byte, error) {
 // Text cleaning
 // ────────────────────────────────────────────────────────────────────
 
-var wsRe = regexp.MustCompile(`\s+`)
+var (
+	wsRe       = regexp.MustCompile(`\s+`)
+	htmlTagRe  = regexp.MustCompile(`<[^>]*>`)
+	htmlEntityRe = regexp.MustCompile(`&[a-zA-Z0-9#]+;`)
+)
 
-// CleanText collapses whitespace and trims.
+// StripHTML removes all HTML tags and common entities from text.
+func StripHTML(s string) string {
+	s = htmlTagRe.ReplaceAllString(s, " ")
+	s = strings.ReplaceAll(s, "&amp;", "&")
+	s = strings.ReplaceAll(s, "&lt;", "<")
+	s = strings.ReplaceAll(s, "&gt;", ">")
+	s = strings.ReplaceAll(s, "&quot;", "\"")
+	s = strings.ReplaceAll(s, "&#39;", "'")
+	s = strings.ReplaceAll(s, "&nbsp;", " ")
+	// Remove any remaining HTML entities
+	s = htmlEntityRe.ReplaceAllString(s, " ")
+	return s
+}
+
+// CleanText strips HTML tags, collapses whitespace and trims.
 func CleanText(s string) string {
+	s = StripHTML(s)
 	return strings.TrimSpace(wsRe.ReplaceAllString(s, " "))
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Jin10-specific cleaning
+// ────────────────────────────────────────────────────────────────────
+
+var (
+	// Matches "分享收藏详情复制" prefix (with optional 分享扫码 variant)
+	jin10PrefixRe = regexp.MustCompile(`^(分享扫码)?分享收藏详情复制`)
+	// Matches timestamps like "17:25:03" at the start (after removing prefix)
+	jin10TimeRe = regexp.MustCompile(`^\d{1,2}:\d{2}(:\d{2})?`)
+	// Matches "VIP" tags
+	jin10VipRe = regexp.MustCompile(`VIP快讯|VIP$`)
+	// Matches garbled special symbols from HTML entities
+	jin10SpecialCharsRe = regexp.MustCompile(`[◆◇●○■□▲△▼▽★☆♦♠♣♥\x{FFFD}\x{FE0F}]`)
+)
+
+// CleanJin10Text removes Jin10-specific prefixes (分享收藏详情复制, timestamps, VIP tags, special chars).
+func CleanJin10Text(s string) string {
+	s = CleanText(s)
+	s = jin10PrefixRe.ReplaceAllString(s, "")
+	s = strings.TrimSpace(s)
+	s = jin10TimeRe.ReplaceAllString(s, "")
+	s = strings.TrimSpace(s)
+	s = jin10VipRe.ReplaceAllString(s, "")
+	s = jin10SpecialCharsRe.ReplaceAllString(s, "")
+	s = strings.TrimSpace(s)
+	return s
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Title validation
+// ────────────────────────────────────────────────────────────────────
 
 // photoCreditRe filters out image-credit lines falsely parsed as titles.
 var photoCreditRe = regexp.MustCompile(`(?i)Getty Images|AFP|Reuters|AP Photo|Bloomberg|Shutterstock|LightRocket|SOPA Images|via Getty|/Getty|Alamy|iStock`)
