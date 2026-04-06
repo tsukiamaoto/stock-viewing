@@ -89,26 +89,68 @@ func UpsertNews(data map[string]interface{}) error {
 	return nil
 }
 
-// InsertNewsBatch inserts multiple news records, skipping duplicates.
+// InsertNewsBatch inserts new news records, skipping items whose link already exists in the DB.
 func InsertNewsBatch(items []map[string]interface{}) error {
 	if len(items) == 0 {
 		return nil
 	}
-	url := baseURL() + "/news"
-	body, err := json.Marshal(items)
+
+	// 1. Collect all links from the batch
+	links := make([]string, 0, len(items))
+	for _, item := range items {
+		if link, ok := item["link"].(string); ok && link != "" {
+			links = append(links, link)
+		}
+	}
+
+	// 2. Query which links already exist in the DB
+	existingLinks := make(map[string]bool)
+	if len(links) > 0 {
+		// Use PostgREST 'in' filter: link=in.(url1,url2,...)
+		// Build the filter value
+		quotedLinks := make([]string, 0, len(links))
+		for _, l := range links {
+			quotedLinks = append(quotedLinks, "\""+l+"\"")
+		}
+		filter := "(" + strings.Join(quotedLinks, ",") + ")"
+		u := fmt.Sprintf("%s/news?select=link&link=in.%s", baseURL(), url.QueryEscape(filter))
+		rows, err := doGet(u)
+		if err == nil {
+			for _, row := range rows {
+				if link, ok := row["link"].(string); ok {
+					existingLinks[link] = true
+				}
+			}
+		}
+	}
+
+	// 3. Filter out duplicates
+	newItems := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		link, _ := item["link"].(string)
+		if link == "" || existingLinks[link] {
+			continue
+		}
+		newItems = append(newItems, item)
+	}
+
+	if len(newItems) == 0 {
+		return nil // all items already exist
+	}
+
+	// 4. Insert only the new items
+	u := baseURL() + "/news"
+	body, err := json.Marshal(newItems)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	for k, v := range authHeaders() {
 		req.Header.Set(k, v)
 	}
-	// If the database does not have a UNIQUE constraint on 'link', 
-	// using on_conflict=link will cause a 42P10 error. 
-	// We use a standard insert here instead.
 	req.Header.Set("Prefer", "return=minimal")
 
 	resp, err := httpClient().Do(req)
@@ -118,7 +160,7 @@ func InsertNewsBatch(items []map[string]interface{}) error {
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("supabase batch insert error %d: %s", resp.StatusCode, string(b))
+		return fmt.Errorf("supabase insert error %d: %s", resp.StatusCode, string(b))
 	}
 	return nil
 }

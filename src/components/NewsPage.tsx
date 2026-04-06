@@ -170,7 +170,12 @@ const NewsSection: React.FC<NewsSectionProps> = ({ source }) => {
     }
   }, [source.endpoint, state.offset]);
 
-  useEffect(() => { fetchNews(); }, [source.endpoint]);
+  useEffect(() => {
+    fetchNews();
+    // Auto-refresh every 5 minutes to match backend crawl schedule
+    const timer = setInterval(() => fetchNews(), 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [source.endpoint]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;

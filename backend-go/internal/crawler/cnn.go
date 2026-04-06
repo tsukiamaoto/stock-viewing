@@ -115,17 +115,26 @@ func fetchCNNSection(sec CNNSection, enhanceFn func(string, string) model.LLMEnh
 			cat = "other"
 		}
 
-		articles = append(articles, model.NewsItem{
-			Title:           title,
-			TranslatedTitle: translated,
-			Link:            link,
-			Snippet:         snippet,
-			OriginalContent: rawSnippet,
-			Category:        cat,
-			PubDate:         time.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05 +0000"),
-			Source:          fmt.Sprintf("CNN %s", sec.Label),
-			SourceColor:     "#cc0000",
-		})
+		// Extract real article date from URL path (/2026/04/03/)
+			articleDate := time.Now().UTC()
+			if matches := datePathRe.FindString(link); matches != "" {
+				// matches is like "/2026/04/03/"
+				if parsed, err := time.Parse("/2006/01/02/", matches); err == nil {
+					articleDate = parsed
+				}
+			}
+
+			articles = append(articles, model.NewsItem{
+				Title:           title,
+				TranslatedTitle: translated,
+				Link:            link,
+				Snippet:         snippet,
+				OriginalContent: rawSnippet,
+				Category:        cat,
+				PubDate:         articleDate.Format(time.RFC3339),
+				Source:          fmt.Sprintf("CNN %s", sec.Label),
+				SourceColor:     "#cc0000",
+			})
 	})
 
 	return articles
