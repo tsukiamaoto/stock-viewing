@@ -13,13 +13,14 @@ import type { WatchlistStock } from './components/WatchlistPage';
 import './index.css';
 
 const INITIAL_CONFIG: WidgetConfig[] = [
-  { id: 'ni225', symbol: 'OANDA:JP225USD', title: '日經 225', subtitle: 'Japan Nikkei 225', width: '1/2', order: 1 },
-  { id: 'kospi', symbol: 'AMEX:EWY', title: '韓國綜合', subtitle: 'South Korea KOSPI', width: '1/2', order: 2, backendSymbol: '^KS11' },
-  { id: 'spx', symbol: 'OANDA:SPX500USD', title: 'S&P 500', subtitle: 'US S&P 500', width: '1/2', order: 3 },
-  { id: 'sox', symbol: 'NASDAQ:SOXX', title: '費城半導體', subtitle: 'PHLX Semiconductor', width: '1/2', order: 4 },
+  { id: 'ni225', symbol: 'TVC:NI225', title: '日經 225', subtitle: 'Japan Nikkei 225', width: '1/2', order: 1, backendSymbol: '^N225', chartSymbol: 'OANDA:JP225USD' },
+  { id: 'kospi', symbol: 'KRX:KOSPI', title: '韓國綜合', subtitle: 'South Korea KOSPI', width: '1/2', order: 2, backendSymbol: '^KS11', chartSymbol: 'AMEX:EWY' },
+  { id: 'spx', symbol: 'SP:SPX500', title: 'S&P 500', subtitle: 'US S&P 500', width: '1/2', order: 3, backendSymbol: '^GSPC', chartSymbol: 'OANDA:SPX500USD' },
+  { id: 'sox', symbol: 'NASDAQ:SOX', title: '費城半導體', subtitle: 'PHLX Semiconductor', width: '1/2', order: 4, backendSymbol: '^SOX', chartSymbol: 'NASDAQ:SOXX' },
   { id: 'brent', symbol: 'OANDA:BCOUSD', title: '布蘭特原油', subtitle: 'Brent Crude Oil', width: '1/2', order: 5 },
-  { id: 'tsm', symbol: 'NYSE:TSM', title: '台積電 ADR', subtitle: 'TSMC ADR (NYSE)', width: '1/2', order: 6 },
-  { id: 'dji', symbol: 'OANDA:US30USD', title: '道瓊工業', subtitle: 'Dow Jones Industrial', width: '1/2', order: 7 },
+  { id: 'btc', symbol: 'BITSTAMP:BTCUSD', title: '比特幣', subtitle: 'Bitcoin BTC/USD', width: '1/2', order: 6, backendSymbol: 'BTC-USD' },
+  { id: 'tsm', symbol: 'NYSE:TSM', title: '台積電 ADR', subtitle: 'TSMC ADR (NYSE)', width: '1/2', order: 7 },
+  { id: 'dji', symbol: 'TVC:DJI', title: '道瓊工業', subtitle: 'Dow Jones Industrial', width: '1/2', order: 8, backendSymbol: '^DJI', chartSymbol: 'OANDA:US30USD' },
 ];
 
 const DEFAULT_WATCHLIST: WatchlistStock[] = [

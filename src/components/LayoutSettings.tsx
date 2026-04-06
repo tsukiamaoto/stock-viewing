@@ -10,6 +10,8 @@ export interface WidgetConfig {
   order: number;
   /** Yahoo Finance ticker for real index data (e.g. "^KS11"). When set, uses IndexInfoWidget instead of TradingView SymbolInfo. */
   backendSymbol?: string;
+  /** Override symbol for TradingView chart embed when `symbol` is not supported by TradingView embeds. */
+  chartSymbol?: string;
 }
 
 interface LayoutSettingsProps {

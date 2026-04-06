@@ -24,11 +24,14 @@ interface MarketSchedule {
 const MARKET_SCHEDULES: Record<string, MarketSchedule> = {
   // US markets (NYSE/NASDAQ): 09:30-16:00 ET (UTC-4 EDT)
   'AMEX:EWT':     { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
-  'NASDAQ:SOXX':  { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
+  'SP:SPX500':    { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
+  'NASDAQ:SOX':   { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
+  'TVC:DJI':      { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
   'NYSE:TSM':     { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
-  // EWY is a KOSPI proxy — show open/close based on Korea Stock Exchange hours
-  // KST = UTC+9, 09:00–15:30
-  'AMEX:EWY':     { openLocal: 9.0,  closeLocal: 15.5, utcOffset: 9  },
+  // Japan: TSE 09:00-15:00 JST (UTC+9)
+  'TVC:NI225':    { openLocal: 9.0,  closeLocal: 15,   utcOffset: 9  },
+  // Korea: KRX 09:00–15:30 KST (UTC+9)
+  'KRX:KOSPI':    { openLocal: 9.0,  closeLocal: 15.5, utcOffset: 9  },
 };
 
 function isMarketOpen(symbol: string): boolean {
@@ -40,6 +43,11 @@ function isMarketOpen(symbol: string): boolean {
     if (utcDay === 6) return false;
     if (utcDay === 0) return now.getUTCHours() >= 22;
     if (utcDay === 5) return now.getUTCHours() < 21;
+    return true;
+  }
+
+  // Crypto (BITSTAMP/COINBASE): 24/7
+  if (symbol.startsWith('BITSTAMP:') || symbol.startsWith('COINBASE:')) {
     return true;
   }
 
@@ -149,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ interval, configs }) => {
             </div>
             <div className="chart-content">
               <ChartWidget
-                symbol={config.symbol}
+                symbol={config.chartSymbol || config.symbol}
                 interval={interval}
                 key={`chart-${config.id}-${refreshKeys[config.id] || 0}`}
               />

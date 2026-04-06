@@ -26,6 +26,7 @@ var (
 	exhaustedSet   = make(map[string]bool)
 	genaiClientMu  sync.Mutex
 	genaiClient    *genai.Client
+	warnMissingKey sync.Once
 )
 
 func getClient() (*genai.Client, error) {
@@ -53,7 +54,9 @@ func EnhanceNewsWithLLM(title, snippet string) model.LLMEnhanceResult {
 	}
 
 	if config.Cfg.GeminiAPIKey == "" {
-		fmt.Println("Warning: GEMINI_API_KEY not found. Using fallback.")
+		warnMissingKey.Do(func() {
+			fmt.Println("Warning: GEMINI_API_KEY not found in environment. Using keyword-based fallback for all news.")
+		})
 		return fallback
 	}
 
