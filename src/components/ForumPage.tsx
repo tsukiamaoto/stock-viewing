@@ -89,6 +89,11 @@ export const ForumPage: React.FC = () => {
   const [cmoneyFeed, setCmoneyFeed] = useState<any[]>([]);
   const [loadingPtt, setLoadingPtt] = useState(true);
   const [loadingCmoney, setLoadingCmoney] = useState(true);
+  const [expandedStocks, setExpandedStocks] = useState<Record<string, boolean>>({});
+
+  const toggleStock = (sym: string) => {
+    setExpandedStocks(prev => ({ ...prev, [sym]: !prev[sym] }));
+  };
 
   // Load Watchlist to inject into CMoney API
   const getWatchlistSymbols = () => {
@@ -174,14 +179,38 @@ export const ForumPage: React.FC = () => {
                   acc[sym].push(post);
                   return acc;
                 }, {})
-              ).map(([sym, posts]: [string, any]) => (
-                <div key={sym} className="cmoney-stock-group" style={{ marginBottom: '24px' }}>
-                  <div style={{ backgroundColor: '#fff', padding: '8px 16px', borderRadius: '8px', marginBottom: '12px', fontWeight: 'bold', color: '#1e293b', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderLeft: '4px solid #f7931e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📈 代號 {sym} 熱門討論
+              ).map(([sym, posts]: [string, any]) => {
+                // Default entirely unassigned undefined to false, but let's make the FIRST one true natively if desired
+                // Or just natively expand all by default if `expandedStocks[sym]` is undefined
+                const isExpanded = expandedStocks[sym] !== false; 
+                return (
+                  <div key={sym} className="cmoney-stock-group" style={{ marginBottom: '24px' }}>
+                    <div 
+                      onClick={() => toggleStock(sym)}
+                      style={{ 
+                        backgroundColor: '#fff', padding: '12px 16px', borderRadius: '8px', 
+                        marginBottom: '12px', fontWeight: 'bold', color: '#1e293b', 
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderLeft: '4px solid #f7931e', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        cursor: 'pointer', transition: 'background-color 0.2s' 
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                    >
+                      <span>📈 代號 {sym} 熱門討論 ({posts.length} 則)</span>
+                      <span style={{ color: '#94a3b8', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
+                        ▼
+                      </span>
+                    </div>
+                    
+                    {isExpanded && (
+                      <div className="cmoney-posts-list" style={{ paddingLeft: '8px', borderLeft: '2px dashed #cbd5e1' }}>
+                        {posts.map((post: any, idx: number) => <FeedCard key={idx} post={post} />)}
+                      </div>
+                    )}
                   </div>
-                  {posts.map((post: any, idx: number) => <FeedCard key={idx} post={post} />)}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

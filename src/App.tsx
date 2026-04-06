@@ -10,6 +10,7 @@ import WatchlistPage from './components/WatchlistPage';
 import NewsPage from './components/NewsPage';
 import StockDetailPage from './components/StockDetailPage';
 import { ForumPage } from './components/ForumPage';
+import CrawlerDashboard from './components/CrawlerDashboard';
 import type { WatchlistStock } from './components/WatchlistPage';
 import './index.css';
 
@@ -52,6 +53,10 @@ function NavSidebar() {
       <Link to="/forum" className={`nav-item ${location.pathname === '/forum' ? 'active' : ''}`}>
         <MessagesSquare size={18} />
         <span>社群論壇討論</span>
+      </Link>
+      <Link to="/logs" className={`nav-item ${location.pathname === '/logs' ? 'active' : ''}`}>
+        <Activity size={18} />
+        <span>系統爬蟲監控</span>
       </Link>
     </nav>
   );
@@ -184,6 +189,7 @@ function App() {
               } />
               <Route path="/news" element={<NewsPage />} />
               <Route path="/forum" element={<ForumPage />} />
+              <Route path="/logs" element={<CrawlerDashboard />} />
               <Route path="/stock/:code" element={<StockDetailPage />} />
             </Routes>
           </main>

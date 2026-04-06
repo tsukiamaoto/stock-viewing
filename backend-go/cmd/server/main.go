@@ -44,6 +44,11 @@ func main() {
 		handler.RegisterNewsRoutes(newsGroup)
 	}
 
+	systemGroup := r.Group("/api/system")
+	{
+		handler.RegisterSystemRoutes(systemGroup)
+	}
+
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC().Format(time.RFC3339)})

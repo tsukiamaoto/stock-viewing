@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"stock-viewing-backend/internal/logger"
 	"stock-viewing-backend/internal/model"
 
 	"github.com/PuerkitoBio/goquery"
@@ -22,18 +23,25 @@ import (
 func FetchJin10News(enhanceFn func(string, string) model.LLMEnhanceResult) []model.NewsItem {
 	items := fetchJin10FlashAPI(enhanceFn)
 	if len(items) > 0 {
-		fmt.Printf("[Jin10] 共取得 %d 則快訊 (Flash API)\n", len(items))
+		logger.RecordSuccess("Jin10", len(items))
+		logger.Crawler().Info("Jin10 fetch", "source", "Flash API", "count", len(items))
 		return deduplicateNews(items)
 	}
 
 	items = fetchJin10RSSHub(enhanceFn)
 	if len(items) > 0 {
-		fmt.Printf("[Jin10] 共取得 %d 則快訊 (RSSHub)\n", len(items))
+		logger.RecordSuccess("Jin10", len(items))
+		logger.Crawler().Info("Jin10 fetch", "source", "RSSHub", "count", len(items))
 		return deduplicateNews(items)
 	}
 
 	items = fetchJin10DirectScrape(enhanceFn)
-	fmt.Printf("[Jin10] 共取得 %d 則快訊 (Direct Scrape)\n", len(items))
+	if len(items) > 0 {
+		logger.RecordSuccess("Jin10", len(items))
+		logger.Crawler().Info("Jin10 fetch", "source", "Direct Scrape", "count", len(items))
+	} else {
+		logger.RecordFailure("Jin10", 1)
+	}
 	return deduplicateNews(items)
 }
 
@@ -44,13 +52,13 @@ func fetchJin10FlashAPI(enhanceFn func(string, string) model.LLMEnhanceResult) [
 	}
 	body, err := FetchURL("https://flash-api.jin10.com/get_flash?channel=-9999&vip=1", extra)
 	if err != nil {
-		fmt.Printf("[Jin10] Flash API 請求失敗: %v\n", err)
+		logger.Crawler().Warn("Jin10 Flash API request failed", "error", err)
 		return nil
 	}
 
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil {
-		fmt.Printf("[Jin10] Flash API 解析失敗: %v\n", err)
+		logger.Crawler().Warn("Jin10 Flash API parse failed", "error", err)
 		return nil
 	}
 

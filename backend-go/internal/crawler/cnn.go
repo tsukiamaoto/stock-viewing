@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"stock-viewing-backend/internal/logger"
 	"stock-viewing-backend/internal/model"
 
 	"github.com/PuerkitoBio/goquery"
@@ -31,7 +32,7 @@ func FetchCNNNews(sections []CNNSection, enhanceFn func(title, snippet string) m
 			articles = articles[:10]
 		}
 		all = append(all, articles...)
-		fmt.Printf("[CNN] %s 抓取 %d 則\n", sec.Label, len(articles))
+		logger.Crawler().Info("CNN fetch", "label", sec.Label, "count", len(articles))
 	}
 
 	// Deduplicate by link
@@ -43,13 +44,17 @@ func FetchCNNNews(sections []CNNSection, enhanceFn func(title, snippet string) m
 			unique = append(unique, a)
 		}
 	}
+	if len(unique) > 0 {
+		logger.RecordSuccess("CNN", len(unique))
+	}
 	return unique
 }
 
 func fetchCNNSection(sec CNNSection, enhanceFn func(string, string) model.LLMEnhanceResult) []model.NewsItem {
 	body, err := FetchURL(sec.URL, nil)
 	if err != nil {
-		fmt.Printf("[CNN] 爬取 %s 失敗: %v\n", sec.URL, err)
+		logger.Crawler().Error("CNN fetch failed", "url", sec.URL, "error", err)
+		logger.RecordFailure("CNN", 1)
 		return nil
 	}
 

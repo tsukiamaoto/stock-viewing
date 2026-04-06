@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	config.LoadConfig()
+	config.Load()
 	if config.Cfg.SupabaseURL == "" {
 		fmt.Println("No Supabase connection configured.")
 		return

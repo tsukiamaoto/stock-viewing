@@ -2,13 +2,13 @@ package service
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"stock-viewing-backend/internal/config"
 	"stock-viewing-backend/internal/crawler"
 	"stock-viewing-backend/internal/database"
+	"stock-viewing-backend/internal/logger"
 	"stock-viewing-backend/internal/model"
 )
 
@@ -64,10 +64,10 @@ func GetAllNewsForAnalysis(symbol string) []model.NewsItem {
 
 // ScheduledCrawlTask is called by the background cron job.
 func ScheduledCrawlTask() {
-	fmt.Printf("[Scheduler] 啟動每分鐘定時爬蟲任務... (%s)\n", time.Now().Format("15:04:05"))
+	logger.Crawler().Info("Scheduled crawl started", "time", time.Now().Format("15:04:05"))
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("[Scheduler] 定時爬蟲發生錯誤: %v\n", r)
+			logger.Crawler().Error("Scheduled crawl panic", "panic", r)
 		}
 	}()
 	// Fetch general macro news
@@ -80,7 +80,7 @@ func ScheduledCrawlTask() {
 	// Fetch tracked CMoney forums
 	symbols := GetActiveSymbols()
 	if len(symbols) > 0 {
-		fmt.Printf("[Scheduler] 背景抓取股市爆料同學會的自選股: %v\n", symbols)
+		logger.Crawler().Info("Background crawl active CMoney symbols", "symbols", symbols)
 		cmoneyItems := crawler.FetchCMoneyRealtime(strings.Join(symbols, ","))
 		SaveForumToSupabase(cmoneyItems)
 	}
@@ -100,12 +100,6 @@ func SaveForumToSupabase(items []map[string]interface{}) {
 			}
 		}
 
-		// Also extract symbol if exists string
-		var symbolStr = ""
-		if sym, ok := n["symbol"].(string); ok {
-			symbolStr = sym
-		}
-
 		batch = append(batch, map[string]interface{}{
 			"title":              n["title"],
 			"translated_title":   n["title"],     // No translation for forum
@@ -116,18 +110,21 @@ func SaveForumToSupabase(items []map[string]interface{}) {
 			"source":             n["source"],
 			"sourceColor":        n["sourceColor"],
 			"published_at":       n["pubDate"],
-			"image_url":          symbolStr,      // HA! Hack symbol into unused image_url column since we don't use it!
 		})
 	}
-	database.InsertNewsBatch(batch)
+	if err := database.InsertNewsBatch(batch); err != nil {
+		logger.Crawler().Error("Forum DB Write failed", "error", err)
+	} else {
+		logger.Crawler().Info("Forum DB Write success", "count", len(batch))
+	}
 }
 
 func saveToSupabase(items []model.NewsItem) {
 	if len(items) == 0 {
-		fmt.Println("[DB] 沒有新聞可以寫入資料庫。")
+		logger.Crawler().Info("DB: No news to write")
 		return
 	}
-	fmt.Printf("[DB] 準備寫入 %d 筆新聞至 Supabase...\n", len(items))
+	logger.Crawler().Info("DB: Writing news batch", "count", len(items))
 
 	batch := make([]map[string]interface{}, 0, len(items))
 	for _, n := range items {
@@ -149,8 +146,8 @@ func saveToSupabase(items []model.NewsItem) {
 	}
 
 	if err := database.InsertNewsBatch(batch); err != nil {
-		fmt.Printf("[DB/Error] 寫入發生錯誤: %v\n", err)
+		logger.Crawler().Error("DB Write failed", "error", err)
 	} else {
-		fmt.Println("[DB] 寫入 Supabase 完成。")
+		logger.Crawler().Info("DB Write success")
 	}
 }

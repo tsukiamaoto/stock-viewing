@@ -14,6 +14,7 @@ const SymbolInfoWidget: React.FC<SymbolInfoWidgetProps> = ({ symbol }) => {
       locale: 'zh_TW',
       colorTheme: 'light',
       isTransparent: true,
+      timezone: 'Asia/Taipei',
     }
   );
 

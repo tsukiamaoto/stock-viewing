@@ -1,8 +1,7 @@
 package crawler
 
 import (
-	"fmt"
-
+	"stock-viewing-backend/internal/logger"
 	"stock-viewing-backend/internal/model"
 
 	"github.com/mmcdole/gofeed"
@@ -33,7 +32,8 @@ func FetchRSSFromSources(sources []model.RSSSource, limitPerSource int, enhanceF
 	for _, src := range sources {
 		feed, err := parser.ParseURL(src.URL)
 		if err != nil {
-			fmt.Printf("[RSS] %s 失敗: %v\n", src.Name, err)
+			logger.Crawler().Error("RSS fetch failed", "source", src.Name, "error", err)
+			logger.RecordFailure(src.Name, 1)
 			continue
 		}
 
@@ -80,6 +80,10 @@ func FetchRSSFromSources(sources []model.RSSSource, limitPerSource int, enhanceF
 				SourceColor:     src.Color,
 			})
 			count++
+		}
+		if count > 0 {
+			logger.RecordSuccess(src.Name, count)
+			logger.Crawler().Info("RSS fetch success", "source", src.Name, "count", count)
 		}
 	}
 

@@ -35,3 +35,13 @@ backend-go/tmp/
 backend-go/build-errors.log
 backend-go/.gopath/
 backend-go/vendor/
+backend-go/logs/
+backend-go/bin/
+backend-go/cmd/test_*/
+backend-go/cmd/translate_test/
+
+# Temporary / Debug files
+tmp_*
+fix_*.py
+*.html.bak
+twse_test.json

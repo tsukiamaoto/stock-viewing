@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"stock-viewing-backend/internal/logger"
 	"github.com/chromedp/chromedp"
 )
 
@@ -31,21 +32,22 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 
 		err := chromedp.Run(ctx,
 			chromedp.Navigate(url),
-			chromedp.Sleep(2 * time.Second), // Allow initial load
-			chromedp.Evaluate(`window.scrollTo(0, document.body.scrollHeight / 2);`, nil),
-			chromedp.Sleep(1 * time.Second),
-			chromedp.Evaluate(`window.scrollTo(0, document.body.scrollHeight);`, nil),
-			chromedp.Sleep(2 * time.Second), // Allow lazy load XHR
+			chromedp.WaitVisible("article", chromedp.ByQuery),
+			chromedp.Sleep(6 * time.Second), // Allow data to settle, skip skeletons
 			chromedp.Evaluate(`
-				Array.from(document.querySelectorAll('article, .article-card, [class*="article"]')).map(el => {
-					let title = el.querySelector('h3, .title, strong') ? el.querySelector('h3, .title, strong').innerText : '';
-					let content = el.querySelector('p, .content, .text') ? el.querySelector('p, .content, .text').innerText : el.innerText;
-					return title + "|||" + content;
-				}).join('###');
+				Array.from(document.querySelectorAll('article, .article-card'))
+					.map(el => el.innerText.trim())
+					.filter(text => text.length > 10)
+					.map(text => "|||" + text)
+					.join('###');
 			`, &res),
 		)
 		
+
+
 		if err != nil {
+			logger.Crawler().Warn("CMoney proxy failure", "symbol", symbol, "error", err)
+			logger.RecordFailure("CMoney", 1)
 			continue // skip on timeout or err
 		}
 
@@ -58,9 +60,13 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 			}
 			parts := strings.SplitN(b, "|||", 2)
 			title := ""
-			content := parts[0]
-			if len(parts) == 2 && parts[0] != "" {
-				title = strings.TrimSpace(parts[0])
+			content := strings.TrimSpace(parts[0])
+			if len(parts) == 2 {
+				// parts[0] is the text before ||| (usually empty since ||| is prepended)
+				// parts[1] is the actual post content
+				if strings.TrimSpace(parts[0]) != "" {
+					title = strings.TrimSpace(parts[0])
+				}
 				content = strings.TrimSpace(parts[1])
 			}
 			
@@ -74,8 +80,8 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 				}
 			}
 			title = fmt.Sprintf("[%s] %s", symbol, title)
-			if len(content) > 300 {
-				content = string([]rune(content)[:300]) + "..."
+			if contentRunes := []rune(content); len(contentRunes) > 300 {
+				content = string(contentRunes[:300]) + "..."
 			}
 
 			post := map[string]interface{}{
@@ -91,6 +97,12 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 			}
 			allPosts = append(allPosts, post)
 			count++
+		}
+		if count > 0 {
+			logger.RecordSuccess("CMoney", count)
+			logger.Crawler().Info("CMoney fetch", "symbol", symbol, "count", count)
+		} else {
+			logger.RecordFailure("CMoney", 1)
 		}
 	}
 

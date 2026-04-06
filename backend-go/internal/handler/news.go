@@ -184,8 +184,17 @@ func mapDBRowsToForumNews(rows []map[string]interface{}) []gin.H {
 			_ = json.Unmarshal([]byte(commentsStr), &comments)
 		}
 		
+		titleStr := getStr(row, "title")
+		symbolStr := ""
+		if strings.HasPrefix(titleStr, "[") {
+			parts := strings.SplitN(titleStr, "]", 2)
+			if len(parts) == 2 {
+				symbolStr = strings.TrimPrefix(parts[0], "[")
+			}
+		}
+
 		result = append(result, gin.H{
-			"title":            getStr(row, "title"),
+			"title":            titleStr,
 			"translated_title": getStr(row, "translated_title"),
 			"snippet":          getStr(row, "translated_content"),
 			"original_content": getStr(row, "translated_content"),
@@ -195,7 +204,7 @@ func mapDBRowsToForumNews(rows []map[string]interface{}) []gin.H {
 			"sourceColor":      getStr(row, "sourceColor"),
 			"pubDate":          getStr(row, "published_at"),
 			"comments":         comments,
-			"symbol":           getStr(row, "image_url"),
+			"symbol":           symbolStr,
 		})
 	}
 	return result

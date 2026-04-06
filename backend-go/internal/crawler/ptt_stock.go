@@ -1,11 +1,11 @@
 package crawler
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"stock-viewing-backend/internal/logger"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -17,13 +17,15 @@ func FetchPTTStockRealtime() []map[string]interface{} {
 		"Cookie": "over18=1", // Probably not needed for Stock, but safe
 	})
 	if err != nil {
-		fmt.Printf("[PTT] Index fetch failed: %v\n", err)
+		logger.Crawler().Warn("PTT index fetch failed", "error", err)
+		logger.RecordFailure("PTT Stock", 1)
 		return nil
 	}
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
 	if err != nil {
-		fmt.Printf("[PTT] Parse failed: %v\n", err)
+		logger.Crawler().Error("PTT Parse failed", "error", err)
+		logger.RecordFailure("PTT Stock", 1)
 		return nil
 	}
 
@@ -137,6 +139,11 @@ func FetchPTTStockRealtime() []map[string]interface{} {
 
 	wg.Wait()
 	
-	fmt.Printf("[PTT] 載入 %d 篇實時文章\n", len(items))
+	if len(items) > 0 {
+		logger.RecordSuccess("PTT Stock", len(items))
+		logger.Crawler().Info("PTT fetch", "count", len(items))
+	} else {
+		logger.RecordFailure("PTT Stock", 1)
+	}
 	return items
 }
