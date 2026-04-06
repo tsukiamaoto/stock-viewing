@@ -33,13 +33,54 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 		err := chromedp.Run(ctx,
 			chromedp.Navigate(url),
 			chromedp.WaitVisible("article", chromedp.ByQuery),
-			chromedp.Sleep(6 * time.Second), // Allow data to settle, skip skeletons
+			chromedp.Sleep(4*time.Second),
+			// Step 1: Click all "繼續閱讀" buttons to expand full content
 			chromedp.Evaluate(`
-				Array.from(document.querySelectorAll('article, .article-card'))
-					.map(el => el.innerText.trim())
-					.filter(text => text.length > 10)
-					.map(text => "|||" + text)
-					.join('###');
+				document.querySelectorAll('.textRule__btn, [class*="readMore"]').forEach(btn => btn.click());
+				'ok';
+			`, &res),
+			chromedp.Sleep(2*time.Second),
+			// Step 2: Extract only post body content, filter ads, strip metadata
+			chromedp.Evaluate(`
+				(() => {
+					const articles = document.querySelectorAll('article.articleContent, div.articleContent, article, .article-card');
+					const results = [];
+					articles.forEach(art => {
+						const text = art.innerText || '';
+						// Filter: skip ads / official promo posts
+						if (text.includes('官方訊息') || text.includes('立即下載')) return;
+						// Clone to avoid modifying the live DOM
+						const clone = art.cloneNode(true);
+						// Remove metadata elements
+						['.articleContent__member', '.articleContent__tags', '.articleTags',
+						 '.articleHavior', '.textRule__btn', '.articleContent__creator-badge',
+						 '.normal__follow', '.articleContent__member-info',
+						 '.articleContent__interaction', '.articleContent__report'
+						].forEach(sel => {
+							clone.querySelectorAll(sel).forEach(el => el.remove());
+						});
+						// Get the body container or fallback to cleaned clone
+						const body = clone.querySelector('.articleContent__baseCont') || clone;
+						let content = body.innerText.trim()
+							.replace(/\n\s*\n/g, '\n')  // collapse blank lines
+							.trim();
+						// Strip leftover UI noise lines
+						content = content.split('\n')
+							.filter(line => {
+								const t = line.trim();
+								if (!t) return false;
+								if (/^(追蹤|分享|留言|讚|打賞|繼續閱讀|Lv\.\d+|\d+分鐘前|\d+小時前|\d+天前|\d+則留言)$/.test(t)) return false;
+								return true;
+							})
+							.join('\n');
+						if (content.length > 5) {
+							// Get author name for title
+							const author = art.querySelector('.normal__text--sm, .articleContent__member .member__name')?.innerText?.trim() || '';
+							results.push('|||' + author + '|||' + content);
+						}
+					});
+					return results.join('###');
+				})();
 			`, &res),
 		)
 		
@@ -51,35 +92,44 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 			continue // skip on timeout or err
 		}
 
-		// parse pseudo json / separator string
+		// parse: each block is |||author|||content
 		blocks := strings.Split(res, "###")
 		count := 0
 		for _, b := range blocks {
 			if len(b) < 10 || count >= 30 {
 				continue
 			}
+			// Format: |||author|||content
+			b = strings.TrimPrefix(b, "|||")
 			parts := strings.SplitN(b, "|||", 2)
-			title := ""
-			content := strings.TrimSpace(parts[0])
+			author := ""
+			content := ""
 			if len(parts) == 2 {
-				// parts[0] is the text before ||| (usually empty since ||| is prepended)
-				// parts[1] is the actual post content
-				if strings.TrimSpace(parts[0]) != "" {
-					title = strings.TrimSpace(parts[0])
-				}
+				author = strings.TrimSpace(parts[0])
 				content = strings.TrimSpace(parts[1])
+			} else {
+				content = strings.TrimSpace(parts[0])
 			}
-			
-			// Fallback title to first 20 chars of content if empty
-			if title == "" || title == "爆料討論" {
-				runes := []rune(content)
+
+			if len(content) < 5 {
+				continue
+			}
+
+			// Build title from author or first line of content
+			title := ""
+			if author != "" {
+				title = author
+			} else {
+				lines := strings.SplitN(content, "\n", 2)
+				runes := []rune(lines[0])
 				if len(runes) > 20 {
 					title = string(runes[:20]) + "..."
 				} else {
-					title = content
+					title = lines[0]
 				}
 			}
 			title = fmt.Sprintf("[%s] %s", symbol, title)
+
 			if contentRunes := []rune(content); len(contentRunes) > 300 {
 				content = string(contentRunes[:300]) + "..."
 			}
@@ -92,8 +142,8 @@ func FetchCMoneyRealtime(symbols string) []map[string]interface{} {
 				"pubDate":     time.Now().Format(time.RFC3339),
 				"category":    "股友",
 				"snippet":     content,
-				"comments":    []map[string]string{}, // Can be expanded
-				"symbol":      symbol, // ADD SYMBOL HERE
+				"comments":    []map[string]string{},
+				"symbol":      symbol,
 			}
 			allPosts = append(allPosts, post)
 			count++
