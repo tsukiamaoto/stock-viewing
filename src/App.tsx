@@ -14,7 +14,7 @@ import './index.css';
 
 const INITIAL_CONFIG: WidgetConfig[] = [
   { id: 'ni225', symbol: 'OANDA:JP225USD', title: '日經 225', subtitle: 'Japan Nikkei 225', width: '1/2', order: 1 },
-  { id: 'kospi', symbol: 'AMEX:EWY', title: '韓國綜合', subtitle: 'South Korea KOSPI', width: '1/2', order: 2 },
+  { id: 'kospi', symbol: 'AMEX:EWY', title: '韓國綜合', subtitle: 'South Korea KOSPI', width: '1/2', order: 2, backendSymbol: '^KS11' },
   { id: 'spx', symbol: 'OANDA:SPX500USD', title: 'S&P 500', subtitle: 'US S&P 500', width: '1/2', order: 3 },
   { id: 'sox', symbol: 'NASDAQ:SOXX', title: '費城半導體', subtitle: 'PHLX Semiconductor', width: '1/2', order: 4 },
   { id: 'brent', symbol: 'OANDA:BCOUSD', title: '布蘭特原油', subtitle: 'Brent Crude Oil', width: '1/2', order: 5 },
@@ -132,7 +132,7 @@ function DashboardPage({
 
 /* ---- App Root ---- */
 function App() {
-  const [interval, setInterval] = useState('D');
+  const [interval, setInterval] = useState('5');
   const [configs, setConfigs] = useState<WidgetConfig[]>(INITIAL_CONFIG);
   const [watchlist, setWatchlist] = useState<WatchlistStock[]>(() => {
     try {

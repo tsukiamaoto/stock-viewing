@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import ChartWidget from './ChartWidget';
 import SymbolInfoWidget from './SymbolInfoWidget';
+import IndexInfoWidget from './IndexInfoWidget';
 import { type WidgetConfig } from './LayoutSettings';
 import { Wifi, WifiOff } from 'lucide-react';
 import { usePolling } from '../hooks/usePolling';
@@ -22,10 +23,12 @@ interface MarketSchedule {
 
 const MARKET_SCHEDULES: Record<string, MarketSchedule> = {
   // US markets (NYSE/NASDAQ): 09:30-16:00 ET (UTC-4 EDT)
-  'AMEX:EWT':     { openLocal: 9.5,  closeLocal: 16, utcOffset: -4 },
-  'AMEX:EWY':     { openLocal: 9.5,  closeLocal: 16, utcOffset: -4 },
-  'NASDAQ:SOXX':  { openLocal: 9.5,  closeLocal: 16, utcOffset: -4 },
-  'NYSE:TSM':     { openLocal: 9.5,  closeLocal: 16, utcOffset: -4 },
+  'AMEX:EWT':     { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
+  'NASDAQ:SOXX':  { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
+  'NYSE:TSM':     { openLocal: 9.5,  closeLocal: 16,   utcOffset: -4 },
+  // EWY is a KOSPI proxy — show open/close based on Korea Stock Exchange hours
+  // KST = UTC+9, 09:00–15:30
+  'AMEX:EWY':     { openLocal: 9.0,  closeLocal: 15.5, utcOffset: 9  },
 };
 
 function isMarketOpen(symbol: string): boolean {
@@ -132,10 +135,17 @@ const Dashboard: React.FC<DashboardProps> = ({ interval, configs }) => {
               </div>
             </div>
             <div style={{ minHeight: '100px' }}>
-              <SymbolInfoWidget
-                symbol={config.symbol}
-                key={`info-${config.id}-${refreshKeys[config.id] || 0}`}
-              />
+              {config.backendSymbol ? (
+                <IndexInfoWidget
+                  yfSymbol={config.backendSymbol}
+                  key={`info-${config.id}-${refreshKeys[config.id] || 0}`}
+                />
+              ) : (
+                <SymbolInfoWidget
+                  symbol={config.symbol}
+                  key={`info-${config.id}-${refreshKeys[config.id] || 0}`}
+                />
+              )}
             </div>
             <div className="chart-content">
               <ChartWidget

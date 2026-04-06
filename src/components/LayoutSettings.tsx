@@ -8,6 +8,8 @@ export interface WidgetConfig {
   subtitle: string;
   width: '1/2' | '1/1';
   order: number;
+  /** Yahoo Finance ticker for real index data (e.g. "^KS11"). When set, uses IndexInfoWidget instead of TradingView SymbolInfo. */
+  backendSymbol?: string;
 }
 
 interface LayoutSettingsProps {

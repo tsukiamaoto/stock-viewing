@@ -1,8 +1,45 @@
 from fastapi import APIRouter, Query
 import yfinance as yf
-from typing import List
 
 router = APIRouter()
+
+@router.get("/index")
+def get_index_quote(yf_symbol: str = Query(..., description="Yahoo Finance symbol, e.g. ^KS11")):
+    """Fetch real index data (e.g. KOSPI ^KS11) directly from Yahoo Finance."""
+    try:
+        ticker = yf.Ticker(yf_symbol)
+        hist = ticker.history(period="10d")
+
+        if hist.empty:
+            return {"status": "error", "message": f"No data for {yf_symbol}", "data": None}
+
+        closes = hist['Close']
+        today   = float(closes.iloc[-1])
+        prev    = float(closes.iloc[-2]) if len(closes) > 1 else today
+        change  = today - prev
+        pct     = (change / prev * 100) if prev != 0 else 0.0
+
+        o = float(hist['Open'].iloc[-1])
+        h = float(hist['High'].iloc[-1])
+        l = float(hist['Low'].iloc[-1])
+
+        return {
+            "status": "success",
+            "data": {
+                "symbol":        yf_symbol,
+                "price":         round(today, 2),
+                "change":        round(change, 2),
+                "changePercent": round(pct, 2),
+                "open":          round(o, 2),
+                "high":          round(h, 2),
+                "low":           round(l, 2),
+                "prevClose":     round(prev, 2),
+            }
+        }
+    except Exception as e:
+        print(f"[Index API] Error fetching {yf_symbol}: {e}")
+        return {"status": "error", "message": str(e), "data": None}
+
 
 @router.get("/watchlist")
 def get_watchlist_quotes(symbols: str = Query(..., description="Comma separated symbols, e.g. 2330,2317")):
